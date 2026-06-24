@@ -1,63 +1,74 @@
-[
-  {
-    "name": "docs-vs-config-port-drift",
-    "prompt": "Run context-gc on this repo. README.md says the API runs on port 8000, but docker-compose.yml maps the service to 8080. Diagnose the drift and propose a fix, but do not edit yet.",
-    "files": {
-      "README.md": "# Service\n\nStart the API at http://localhost:8000.\n",
-      "docker-compose.yml": "services:\n  api:\n    ports:\n      - \"8080:8080\"\n"
+{
+  "skill_name": "context-gc",
+  "evals": [
+    {
+      "id": 1,
+      "name": "docs-vs-config-port-drift",
+      "prompt": "Run context-gc on this repo. README.md says the API runs on port 8000, but docker-compose.yml maps the service to 8080. Diagnose the drift and propose a fix, but do not edit yet.",
+      "files": {
+        "README.md": "# Service\n\nStart the API at http://localhost:8000.\n",
+        "docker-compose.yml": "services:\n  api:\n    ports:\n      - \"8080:8080\"\n"
+      },
+      "expected_output": "A MARK-only entropy report that flags README.md as stale/contradictory against docker-compose.yml, proposes reconciling to 8080, and mentions SOURCES.md as a write barrier.",
+      "assertions": [
+        "States that Phase 1/MARK is read-only and does not edit files",
+        "Flags the port mismatch as 🔴 CONTRADICTION or 🟠 STALE",
+        "Identifies docker-compose.yml as the likely root for the live port",
+        "Proposes updating README.md to 8080",
+        "Mentions SOURCES.md or authority map/write barrier"
+      ]
     },
-    "expected_output": [
-      "Phase 1 MARK only; no edits before confirmation",
-      "Flags a contradiction or stale claim with severity 🔴 or 🟠",
-      "Identifies docker-compose.yml as the likely root for the live port",
-      "Proposes reconciling README.md to port 8080",
-      "Mentions adding/updating SOURCES.md as the write barrier"
-    ]
-  },
-  {
-    "name": "local-prod-config-version-drift",
-    "prompt": "Our local config.yaml has _config_version: 27 while the server migrated config has _config_version: 29. Treat this as context/config drift and produce a sweep plan.",
-    "files": {
-      "config.yaml": "_config_version: 27\nmodel: old\n",
-      "server-config.snapshot.yaml": "_config_version: 29\nmodel: new\n"
+    {
+      "id": 2,
+      "name": "local-prod-config-version-drift",
+      "prompt": "Our local config.yaml has _config_version: 27 while the server migrated config has _config_version: 29. Treat this as context/config drift and produce a sweep plan.",
+      "files": {
+        "config.yaml": "_config_version: 27\nmodel: old\n",
+        "server-config.snapshot.yaml": "_config_version: 29\nmodel: new\n"
+      },
+      "expected_output": "A configuration drift report and gated sweep plan that treats the server migrated snapshot as the likely root only with justification or asks for confirmation before overwriting local config.",
+      "assertions": [
+        "Treats this as configuration drift rather than only documentation cleanup",
+        "States or asks which config is authoritative/root",
+        "Produces a sweep plan gated by confirmation",
+        "Does not directly overwrite config.yaml without approval",
+        "Proposes recording root-to-copy relationship in SOURCES.md"
+      ]
     },
-    "expected_output": [
-      "Treats this as configuration drift, not just documentation cleanup",
-      "Asks or states why the migrated server snapshot is the authority/root",
-      "Produces a sweep plan gated by confirmation",
-      "Does not directly overwrite config.yaml without approval",
-      "Records the root-to-copy relationship in SOURCES.md"
-    ]
-  },
-  {
-    "name": "agent-context-rot-dead-skill",
-    "prompt": "GC this agent context. SOUL.md still tells the agent to use a deleted skill called old-scraper, while skills/new-scraper/SKILL.md exists. There are also three overlapping rules about scraping limits.",
-    "files": {
-      "SOUL.md": "Use old-scraper for all collection.\nLimit scraping to 10 req/s.\nNever exceed 5 req/s.\nScraping should be conservative.\n",
-      "skills/new-scraper/SKILL.md": "---\nname: new-scraper\n---\n# New scraper\n"
+    {
+      "id": 3,
+      "name": "agent-context-rot-dead-skill",
+      "prompt": "GC this agent context. SOUL.md still tells the agent to use a deleted skill called old-scraper, while skills/new-scraper/SKILL.md exists. There are also three overlapping rules about scraping limits.",
+      "files": {
+        "SOUL.md": "Use old-scraper for all collection.\nLimit scraping to 10 req/s.\nNever exceed 5 req/s.\nScraping should be conservative.\n",
+        "skills/new-scraper/SKILL.md": "---\nname: new-scraper\n---\n# New scraper\n"
+      },
+      "expected_output": "An agent-context-rot entropy report that marks old-scraper as orphan/dead reference and the scraping limit rules as contradiction/duplication, then proposes compacting to one policy after confirmation.",
+      "assertions": [
+        "Recognizes this as AI-agent context rot",
+        "Flags old-scraper as an orphan/dead reference",
+        "Flags overlapping scraping rules as duplication or contradiction",
+        "Proposes compacting to one authoritative scraping policy",
+        "Requires user confirmation before editing SOUL.md"
+      ]
     },
-    "expected_output": [
-      "Recognizes this as agent context rot",
-      "Flags old-scraper as an orphan/dead reference",
-      "Flags overlapping scraping rules as duplication or contradiction",
-      "Proposes compacting to one authoritative scraping policy",
-      "Requires user confirmation before editing SOUL.md"
-    ]
-  },
-  {
-    "name": "knowledge-base-duplication-compaction",
-    "prompt": "Our knowledge base has the same deployment instructions copied in README.md, docs/deploy.md, and wiki/export.md. They currently agree, but I want to prevent future drift. Run context-gc.",
-    "files": {
-      "README.md": "Deploy: run ./deploy.sh and then restart service.\n",
-      "docs/deploy.md": "Deploy: run ./deploy.sh and then restart service.\n",
-      "wiki/export.md": "Deploy: run ./deploy.sh and then restart service.\n"
-    },
-    "expected_output": [
-      "Flags duplication as 🟡 drift factory even when copies currently agree",
-      "Chooses or asks for a canonical root",
-      "Proposes replacing duplicates with pointers, not rewriting all copies forever",
-      "Updates SOURCES.md as the write barrier",
-      "Explains why duplication creates future contradictions"
-    ]
-  }
-]
+    {
+      "id": 4,
+      "name": "knowledge-base-duplication-compaction",
+      "prompt": "Our knowledge base has the same deployment instructions copied in README.md, docs/deploy.md, and wiki/export.md. They currently agree, but I want to prevent future drift. Run context-gc.",
+      "files": {
+        "README.md": "Deploy: run ./deploy.sh and then restart service.\n",
+        "docs/deploy.md": "Deploy: run ./deploy.sh and then restart service.\n",
+        "wiki/export.md": "Deploy: run ./deploy.sh and then restart service.\n"
+      },
+      "expected_output": "A duplication/compaction report that treats repeated deployment instructions as a drift factory, asks or chooses a canonical root, and proposes replacing duplicates with pointers plus SOURCES.md.",
+      "assertions": [
+        "Flags duplication as 🟡 duplicate or drift factory even though copies agree",
+        "Chooses or asks for a canonical root",
+        "Proposes replacing duplicate restatements with pointers",
+        "Mentions SOURCES.md/write barrier",
+        "Explains why duplication creates future contradictions"
+      ]
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 ---
 name: context-gc
-description: Garbage collection for documentation and AI-agent context — detects drift, staleness, contradictions, and duplication across docs/configs/READMEs/knowledge bases and agent instructions (SOUL/CLAUDE.md/memory), traces every fact to its authoritative source, then converges or sweeps the garbage and leaves a SOURCES.md so future drift is caught early. Use when docs are out of date, configs drifted (local vs prod), sources contradict each other, a knowledge base grew into a mess, or an agent's context/instructions rotted ("context rot"). Triggers include "docs are stale", "config drift", "this contradicts that", "clean up the docs", "gc the docs/knowledge base", "treat document or agent drift".
+description: Garbage-collect docs, configs, knowledge bases, and AI-agent context. Use when docs are stale, configs drift, sources contradict, knowledge bases bloat, or CLAUDE.md/SOUL/memory has context rot.
 resources:
   - LOCAL_FS
 ---
@@ -18,7 +18,7 @@ source of truth" (= GC **roots**), "baseline" (= the **live set**), "drift" (= *
 "compaction" (the literal GC term, reused for trimming agent context). context-gc makes that mapping
 explicit and operational.
 
-> **Full mental model:** load `references/gc-model.md`.
+> **Progressive loading:** read `references/gc-model.md` only when the user asks about the metaphor/design; read `references/entropy-checklist.md` during MARK; read `references/treatment-playbook.md` during SWEEP; read `references/hooks.md` only when installing or changing hooks.
 
 | GC concept | Context entropy |
 |---|---|

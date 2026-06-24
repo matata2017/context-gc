@@ -50,9 +50,7 @@ Full mental model: [`references/gc-model.md`](references/gc-model.md)
 
 ## Usage (as a Claude Code skill)
 
-```
-/claude add skill
-```
+Install this directory as a Claude skill (or copy it into your Claude skills directory). The skill triggers on tasks like stale docs, config drift, contradictory sources, knowledge-base bloat, or agent context rot.
 
 Then when you say anything like:
 - "The docs are stale / out of date"
