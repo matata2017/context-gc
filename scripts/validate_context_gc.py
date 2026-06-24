@@ -65,6 +65,17 @@ def main() -> int:
         if not isinstance(e["assertions"], list) or len(e["assertions"]) < 3:
             fail(f"eval assertions too weak: {e.get('name')}")
 
+    for demo in (
+        "demo-doc-vs-config",
+        "demo-agent-context-rot",
+        "demo-kb-duplication",
+    ):
+        path = ROOT / "examples" / demo
+        if not path.exists():
+            fail(f"missing demo: {demo}")
+        if not (path / "expected-entropy-report.md").exists():
+            fail(f"demo missing expected report: {demo}")
+
     proc = subprocess.run(
         [sys.executable, str(HOOK), "dirty-card"],
         input=json.dumps({"tool_name": "Write", "tool_input": {"file_path": "docs/test.md"}}),

@@ -14,6 +14,19 @@
 └───────────┘    └───────────┘    └───────────┘
 ```
 
+## Quickstart
+
+1. **Read the skill**: [`SKILL.md`](SKILL.md)
+2. **Try a demo**:
+   - [`examples/demo-doc-vs-config/`](examples/demo-doc-vs-config/) — README says port 8000, compose says 8080.
+   - [`examples/demo-agent-context-rot/`](examples/demo-agent-context-rot/) — SOUL references a dead skill and conflicting rate limits.
+   - [`examples/demo-kb-duplication/`](examples/demo-kb-duplication/) — the same deploy instruction is copied into README/docs/wiki.
+3. **Run the structural validator**:
+   ```bash
+   python scripts/validate_context_gc.py
+   ```
+4. **Optional: install hooks** using [`examples/claude-settings-hooks.json`](examples/claude-settings-hooks.json). Hooks create dirty cards in `.context-gc/dirty.jsonl` and remind you to run MARK.
+
 ## The problem
 
 Documentation, configs, knowledge bases, and AI-agent instructions rot:
@@ -87,7 +100,10 @@ context-gc/
 ├── scripts/
 │   └── context_gc_hook.py           # Hook helper: dirty cards + stop reminder
 ├── examples/
-│   └── claude-settings-hooks.json   # Example .claude/settings.json hook config
+│   ├── claude-settings-hooks.json   # Example .claude/settings.json hook config
+│   ├── demo-doc-vs-config/          # Stale README vs live docker-compose port
+│   ├── demo-agent-context-rot/      # Dead skill + conflicting agent instructions
+│   └── demo-kb-duplication/         # Same fact copied across README/docs/wiki
 └── templates/
     └── SOURCES.md.template          # Authority map template (the write barrier)
 ```
