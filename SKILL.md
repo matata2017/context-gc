@@ -63,6 +63,8 @@ explicit and operational.
    — for each fact-domain, its root, the derived copies that must match, and a re-check command.
 2. This is the **write barrier**: the next run reads SOURCES.md and re-checks only the declared
    root→copy pairs — fast incremental GC instead of a full re-scan.
+3. Optional but recommended: install the hook recipes in `references/hooks.md` so context-bearing
+   file edits create dirty cards in `.context-gc/dirty.jsonl` and trigger an end-of-session reminder.
 
 ## Safety rules — never corrupt the heap
 1. **Never collect a live object.** Don't delete/rewrite anything you haven't confirmed is garbage.

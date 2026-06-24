@@ -66,6 +66,11 @@ Claude runs the **3-phase GC cycle**:
 2. **SWEEP** — presents a sweep plan for confirmation, then applies treatments
 3. **BARRIER** — writes/updates `SOURCES.md` (authority map for cheaper future runs)
 
+Optional hook integration turns this into an incremental GC: `PostToolUse` records dirty context
+files and `Stop` reminds you to run MARK before entropy accumulates. See
+[`references/hooks.md`](references/hooks.md) and
+[`examples/claude-settings-hooks.json`](examples/claude-settings-hooks.json).
+
 Read the full skill: [`SKILL.md`](SKILL.md)
 
 ## Files
@@ -78,7 +83,12 @@ context-gc/
 ├── references/
 │   ├── gc-model.md                  # GC ↔ entropy mental model (must read once)
 │   ├── entropy-checklist.md         # Garbage taxonomy + detection methods
-│   └── treatment-playbook.md        # Per-type sweep actions
+│   ├── treatment-playbook.md        # Per-type sweep actions
+│   └── hooks.md                     # Optional Claude Code hook recipes
+├── scripts/
+│   └── context_gc_hook.py           # Hook helper: dirty cards + stop reminder
+├── examples/
+│   └── claude-settings-hooks.json   # Example .claude/settings.json hook config
 └── templates/
     └── SOURCES.md.template          # Authority map template (the write barrier)
 ```
