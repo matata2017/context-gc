@@ -16,8 +16,9 @@
 
 ## Quickstart
 
-1. **Read the skill**: [`SKILL.md`](SKILL.md)
-2. **Try a demo**:
+1. **Install**: see [`INSTALL.md`](INSTALL.md)
+2. **Read the skill**: [`SKILL.md`](SKILL.md)
+3. **Try a demo**:
    - [`examples/demo-doc-vs-config/`](examples/demo-doc-vs-config/) — README says port 8000, compose says 8080.
    - [`examples/demo-agent-context-rot/`](examples/demo-agent-context-rot/) — SOUL references a dead skill and conflicting rate limits.
    - [`examples/demo-kb-duplication/`](examples/demo-kb-duplication/) — the same deploy instruction is copied into README/docs/wiki.
@@ -88,8 +89,10 @@ Read the full skill: [`SKILL.md`](SKILL.md)
 
 ```
 context-gc/
+├── .github/workflows/validate.yml   # GitHub Actions validation
 ├── SKILL.md                         # Full skill — GC cycle, safety rules, output formats
 ├── README.md                        # This file
+├── INSTALL.md                       # Install, hooks, CI quick guide
 ├── research/
 │   └── context-gc-research.md       # Sources and design recommendations
 ├── references/

@@ -1,0 +1,37 @@
+name: validate
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Validate context-gc structure
+        run: python scripts/validate_context_gc.py
+
+      - name: Check JSON formatting
+        run: python -m json.tool evals/evals.json > /tmp/evals.json
+
+  link-check:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Link check with lychee
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: --no-progress --exclude-mail README.md research/context-gc-research.md references/**/*.md
