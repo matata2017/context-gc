@@ -80,11 +80,13 @@ explicit and operational.
 **Entropy report (Phase 1):**
 ```
 ## Entropy report — <scope>
-🔴 CONTRADICTION  <file:loc>  "<claim>"  ↔  root <root>: "<truth>"   → reconcile
-🟠 STALE          <file:loc>  "<claim>"  — root <root> moved on       → update/delete
-🟠 ORPHAN         <file:loc>  refers to <gone>  (not in root)         → delete/repoint
-🟡 DUPLICATE      <fact> in <fileA>, <fileB>, <fileC>  — no authority → compact → <root>
-🟢 BLOAT          <file/section>  redundant/overgrown                 → condense
+Status legend: SYNCED | DRIFTED | NOT_CHECKED | FORK | UNKNOWN_ROOT
+🔴 CONTRADICTION  DRIFTED       <file:loc>  "<claim>"  ↔  root <root>: "<truth>"   → reconcile
+🟠 STALE          DRIFTED       <file:loc>  "<claim>"  — root <root> moved on       → update/delete
+🟠 ORPHAN         DRIFTED       <file:loc>  refers to <gone>  (not in root)         → delete/repoint
+🟡 DUPLICATE      UNKNOWN_ROOT  <fact> in <fileA>, <fileB>, <fileC>  — no authority → compact → <root>
+🟢 BLOAT          NOT_CHECKED   <file/section>  redundant/overgrown                 → condense
+⚪ FORK           FORK          <file:loc> intentionally diverges from root          → document exception
 Roots used: <list>.   Ambiguous authority (need your call): <list>.
 ```
 

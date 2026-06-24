@@ -38,7 +38,7 @@ The metaphor is structurally exact, not decorative — GC concepts map 1:1:
 | Compaction | Dedupe to one authority; trim agent context |
 | Write barrier | `SOURCES.md` — authority map for cheap re-check next time |
 
-Full mental model: [`references/gc-model.md`](references/gc-model.md)
+Full research notes and design rationale: [`research/context-gc-research.md`](research/context-gc-research.md).
 
 ## What it covers
 
@@ -77,7 +77,8 @@ Read the full skill: [`SKILL.md`](SKILL.md)
 context-gc/
 ├── SKILL.md                         # Full skill — GC cycle, safety rules, output formats
 ├── README.md                        # This file
-├── LICENSE
+├── research/
+│   └── context-gc-research.md       # Sources and design recommendations
 ├── references/
 │   ├── gc-model.md                  # GC ↔ entropy mental model (must read once)
 │   ├── entropy-checklist.md         # Garbage taxonomy + detection methods

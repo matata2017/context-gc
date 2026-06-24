@@ -79,7 +79,18 @@ paths if needed.
 }
 ```
 
-## Hook event assumptions
+### 4. CI scanners (optional remote gate)
+
+Use hooks as the local write barrier, and CI as the remote gate. Do not reimplement mature tools; call them when present:
+
+- `lychee` for link rot and broken anchors.
+- `markdownlint` for Markdown structure and consistency.
+- `Vale` for prose style, terminology, and project writing rules.
+- Project-specific scripts for config/doc drift (for example, compare documented ports with compose files).
+
+Treat scanner output as MARK evidence. Only auto-fix mechanical formatting; do not auto-rewrite facts without a sweep plan.
+
+
 
 Claude Code passes hook event JSON on stdin. The script is deliberately defensive and supports
 several common shapes:

@@ -18,12 +18,15 @@ derived copies must match it, and how to re-check.
 ### `{{domain-name}}` — {{one-line what this fact domain covers}}
 
 - **Root:** `{{path}}` ({{why it is authoritative}})
+- **Owner:** `{{team/person/unknown}}`
+- **Risk:** `{{low | medium | high}}` — impact if this drifts
 - **Copies:**
-  - `{{path}}` — {{relationship: "must match root", "derived from root for display", etc.}}
+  - `{{path}}` — {{relationship: "must match root", "derived from root for display", "intentional fork", etc.}}
   - `{{path}}` — {{relationship}}
 - **Re-check:** `{{command, e.g. diff the copies, or grep for the value in root vs copy}}`
 - **Last verified:** {{date}}
-- **Status:** `{{SYNCED | DRIFTED | FORK}}`
+- **Last checked by:** {{human/agent/tool}}
+- **Status:** `{{SYNCED | DRIFTED | NOT_CHECKED | FORK | UNKNOWN_ROOT}}`
 
 ---
 

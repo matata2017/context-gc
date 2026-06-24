@@ -49,7 +49,26 @@ critical stuff. For agents this is **context-window pressure**.
 - **Detect:** sections that restate each other; ever-growing logs/status files; "we tried X, then Y,
   then Z" archaeology that should be one current statement.
 
+## Status model (borrowed from configuration drift tools)
+
+Use a status code alongside severity so reports are machine-readable:
+
+- `SYNCED` — checked against root and currently matches.
+- `DRIFTED` — checked against root and differs.
+- `NOT_CHECKED` — not checked because the root/tool/scope cannot verify it yet.
+- `UNKNOWN_ROOT` — the claim may be true, but no authority has been established.
+- `FORK` — intentionally diverges from root; document the exception in `SOURCES.md` and do not keep re-flagging it.
+
+
 ## Agent-specific (智能体漂移 / context rot)
+
+Use this four-part context-rot taxonomy when the heap is an agent's own context:
+
+- **Poisoning** — false summaries, hallucinated state, or wrong memories that future steps repeatedly reuse.
+- **Distraction** — too much irrelevant history/tool output causing the model to repeat old actions or lose the current goal.
+- **Confusion** — too many overlapping tool definitions, skills, or instructions; the model chooses the wrong one.
+- **Clash** — mutually incompatible instructions or facts in SOUL/CLAUDE.md/memory/session context.
+
 When the heap is an agent's own config (SOUL / CLAUDE.md / skills / memory), all of the above apply,
 plus:
 - **Stale instruction:** a rule describing a tool/flow that has since changed → 🟠.
