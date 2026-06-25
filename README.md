@@ -97,6 +97,31 @@ context-gc maps to the four-layer Loop Engineering architecture defined by LangC
 
 Full design: [`references/loop-engineering.md`](references/loop-engineering.md) · Architecture: [`references/architecture.md`](references/architecture.md)
 
+## Autonomous triggers — the agent calls context-gc on its own
+
+context-gc is built to be invoked **by the agent, not by a human typing "run context-gc"**. An agent
+running in a loop (Hermes, Ralph, any framework) has no human watching — it must recognize, on its
+own, the moments where it has likely introduced drift and run a tick before moving on. The SKILL
+trains for exactly these signals, each covered by an eval that scores whether the agent acts *without
+being told*:
+
+| Signal in the agent's own workflow | What the agent should do unprompted | Eval |
+|---|---|---|
+| Changed a SOURCES root file (code/config) | Check the copies it may have left stale | `autonomous-trigger-after-code-change` |
+| Changed a config value (port, version, pool size) | Check the docs that document it | `autonomous-config-change-checks-docs` |
+| Completed a task in a loop (the "I'm done" moment) | Run `gc_tick --gate` to verify no drift before reporting done | `autonomous-verify-gate-before-done` |
+| Ran N iterations / PROGRESS.md grew | Run `gc_tick` to compact its own loop state | `autonomous-trigger-in-loop` |
+| About to write a memory that contradicts existing memory | Flag the conflict instead of silently appending | `autonomous-trigger-on-memory-write` |
+| About to delete/overwrite a memory or context file | Refuse — confirm it's garbage first; archive, don't delete | `autonomous-irreversible-op-guard` |
+
+The discipline is the same in every row: **the agent treats drift-checking as part of its own
+definition of done**, escalates only what `autonomy` policy reserves for a human, and never silently
+deletes a possibly-live object. These evals are scored with a consensus LLM judge (multiple samples,
+majority vote) so the signal isn't a single noisy judgment — see
+[`scripts/eval_for_skillopt.py`](scripts/eval_for_skillopt.py) and
+[`scripts/skillopt_optimize.py`](scripts/skillopt_optimize.py) for the optimizer that improves the
+SKILL against these.
+
 ## Usage (as a Claude Code skill)
 
 Install this directory as a Claude skill (or copy it into your Claude skills directory). The skill triggers on tasks like stale docs, config drift, contradictory sources, knowledge-base bloat, or agent context rot.

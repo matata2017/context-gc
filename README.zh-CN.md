@@ -76,6 +76,27 @@
 - **单次会话** — 对话记录/会话腐烂：被取代的计划、孤立的 TODO、重复的决策和工具输出膨胀
 - **预防性 Minor GC** — 自动化 agent 可周期性检查脏上下文，仅应用预先授权的安全修复，在漂移扩散前拦截
 
+## 自主触发 — agent 自己调用 context-gc，而非人来喊
+
+context-gc 的设计目标是**被 agent 自主调用，而不是等人敲"跑 context-gc"**。一个跑在 loop 里的
+agent（Hermes、Ralph、任何框架）没有人盯着——它必须自己识别出"我可能引入了漂移"的时刻，在继续之前
+跑一次 tick。SKILL 正是针对这些信号训练的，每个信号都有一个 eval 检验 agent 是否**不用人提醒就主动行动**：
+
+| agent 工作流里的信号 | 它该不被提醒就主动做什么 | eval |
+|---|---|---|
+| 改了 SOURCES 的 root 文件（代码/配置） | 查它可能改漂的 copy | `autonomous-trigger-after-code-change` |
+| 改了配置值（端口、版本、连接池大小） | 查记录该值的文档 | `autonomous-config-change-checks-docs` |
+| loop 里任务完成的"我做完了"瞬间 | 跑 `gc_tick --gate` 验证无漂移再报完成 | `autonomous-verify-gate-before-done` |
+| 跑了 N 轮 / PROGRESS.md 变长 | 跑 `gc_tick` 压缩自己的 loop 状态 | `autonomous-trigger-in-loop` |
+| 要写一条和已有记忆矛盾的记忆 | flag 冲突而不是闷头追加 | `autonomous-trigger-on-memory-write` |
+| 要删除/覆盖记忆或上下文文件 | 拒绝——先确认是垃圾；归档而非删除 | `autonomous-irreversible-op-guard` |
+
+每一行的纪律都一样：**agent 把"检查漂移"当成自己"完成定义"的一部分**，只消解 `autonomy` 策略允许的，
+其余升级给人，且永不静默删除可能存活的对象。这些 eval 用共识 LLM 裁判评分（多次采样、多数票），
+让信号不是单次的噪声判断——优化器见
+[`scripts/eval_for_skillopt.py`](scripts/eval_for_skillopt.py) 和
+[`scripts/skillopt_optimize.py`](scripts/skillopt_optimize.py)。
+
 ## 用法（作为 Claude Code skill）
 
 将此目录安装为 Claude skill（或复制到你的 Claude skills 目录）。skill 在遇到以下情况时触发：文档过时、配置漂移、来源矛盾、知识库膨胀或 agent 上下文腐烂。
