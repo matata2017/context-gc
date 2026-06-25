@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Layer 4 — 爬坡循环（Hill Climbing）分析引擎。
 
-扫描 patterns.jsonl 和 decisions.jsonl，发现重复出现的漂移模式，自动生成
-SOURCES.md / 检测规则的优化方案。人审核后 apply。
+扫描 patterns.jsonl（agent 成功自决沉淀的漂移模式，每条带 scope 分支标注），发现重复出现的
+模式并聚类，自动生成 SOURCES.md / 检测规则的优化方案。人审核后 apply。
+
+跨 scope 重复（多个分支都出现同一模式）是更强的证据——见 research/next-phase-design.md。
 
 这是 Loop Engineering 第四层的核心——让系统自己学会更好地检测漂移。
 
@@ -17,10 +19,8 @@ import argparse
 import hashlib
 import json
 import pathlib
-import sys
 import time
 from collections import defaultdict
-from typing import Any
 
 
 def _load_jsonl(path: pathlib.Path) -> list[dict]:
@@ -68,6 +68,22 @@ def _proposal_id(cluster_key: str) -> str:
     h = hashlib.sha1(cluster_key.encode()).hexdigest()[:8]
     kind = cluster_key.split("|")[0]
     return f"prop-{kind}-{h}"
+
+
+def _scope_count(group: list[dict]) -> int:
+    """How many distinct git branches this cluster's patterns came from.
+
+    Per next-phase-design.md: a drift pattern that recurs across MULTIPLE scopes (branches) is a real
+    regularity, not a single-branch accident — it is stronger evidence for a proposal. A cluster
+    confined to one branch may just be that branch's local quirk.
+    """
+    branches = set()
+    for p in group:
+        sc = p.get("scope") or {}
+        b = sc.get("branch")
+        if b:
+            branches.add(b)
+    return len(branches)
 
 
 def _build_proposal(cluster_key: str, group: list[dict], sources: set[str]) -> dict:
@@ -147,6 +163,7 @@ def _build_proposal(cluster_key: str, group: list[dict], sources: set[str]) -> d
         "kind": kind,
         "domain": domain,
         "occurrences": count,
+        "scope_count": _scope_count(group),  # distinct branches — higher = stronger cross-scope evidence
         "latest": latest,
         "sources": sorted(sources),
         "action": action,
@@ -158,7 +175,6 @@ def analyze(target: pathlib.Path, min_occurrences: int = 3) -> list[dict]:
     """扫描状态目录，生成优化建议列表。"""
     state = target / ".context-gc"
     patterns = _load_jsonl(state / "patterns.jsonl")
-    decisions = _load_jsonl(state / "decisions.jsonl")
 
     if not patterns:
         return []
@@ -197,8 +213,8 @@ def _generate_so_md_entry(proposal: dict) -> str:
         f"### `{name}` — auto-generated from pattern analysis",
         "",
         f"- **Root:** `{root}`",
-        f"- **Owner:** `auto`",
-        f"- **Risk:** `low`",
+        "- **Owner:** `auto`",
+        "- **Risk:** `low`",
         "- **Copies:**",
     ]
     for c in copies:
@@ -207,7 +223,7 @@ def _generate_so_md_entry(proposal: dict) -> str:
         lines.append(f"- **Auto-fix:** `{autofix}`")
     if pattern:
         lines.append(f"- **Pattern:** `{pattern}`")
-    lines.append(f"- **Status:** `NOT_CHECKED`")
+    lines.append("- **Status:** `NOT_CHECKED`")
     lines.append(f"- **Reason:** {reason}")
     lines.append("")
     lines.append("---")
@@ -316,7 +332,7 @@ def main() -> int:
         print("# 爬坡分析 · 无需优化")
         print()
         print(f"  已积累 {out['total_patterns']} 个 pattern，但还没有同类型模式重复 ≥ {args.min_occurrences} 次。")
-        print(f"  继续使用，pattern 积累够多时会自动产生建议。")
+        print("  继续使用，pattern 积累够多时会自动产生建议。")
         return 0
 
     print(f"# 爬坡分析 · {len(proposals)} 条优化建议")

@@ -27,11 +27,12 @@ import time
 from typing import Any
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from _common import agent_may_resolve, load_autonomy_policy  # noqa: E402
+from _common import agent_may_resolve, current_scope, load_autonomy_policy  # noqa: E402
 import minor_gc  # noqa: E402
 
 QUEUE = "review-queue.json"
 DECISIONS = "decisions.jsonl"
+PATTERNS = "patterns.jsonl"
 
 
 def _state(target: pathlib.Path) -> pathlib.Path:
@@ -68,6 +69,35 @@ def _domain_for_item(target: pathlib.Path, item: dict[str, Any]) -> minor_gc.Dom
 def _append_audit(target: pathlib.Path, record: dict[str, Any]) -> None:
     with (_state(target) / DECISIONS).open("a", encoding="utf-8") as f:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+
+def _record_pattern(target: pathlib.Path, record: dict[str, Any]) -> None:
+    """Sediment a successful agent resolution into patterns.jsonl for the hill-climb loop.
+
+    analyze_patterns.py clusters these to find drift that recurs; the evol loop turns recurring
+    clusters into proposals. Every pattern carries its scope (git branch/sha) so feature-branch
+    learnings never pollute main's optimization — the cross-scope guard from next-phase-design.md.
+    Only applied resolutions become patterns; escalations and no-ops do not.
+    """
+    if not record.get("applied"):
+        return
+    action = record.get("action", {})
+    evidence = record.get("evidence", [])
+    pattern = {
+        "id": f"{record.get('kind', 'drift')}-{record.get('item', '')[:12]}",
+        "kind": record.get("kind", "drift"),
+        "source": record.get("by", "agent") + "_resolve",
+        "ts": record.get("ts"),
+        "scope": record.get("scope"),
+        "signature": {
+            "op": str(action.get("op", "")),
+            "evidence": evidence,
+            "root_file": evidence[0].split(":", 1)[0] if evidence else "",
+            "copy_file": evidence[1].split(":", 1)[0] if len(evidence) > 1 else "",
+        },
+    }
+    with (_state(target) / PATTERNS).open("a", encoding="utf-8") as f:
+        f.write(json.dumps(pattern, ensure_ascii=False) + "\n")
 
 
 def _execute(target: pathlib.Path, item: dict[str, Any], choice: int, cfg: dict[str, Any], by: str, level: str) -> dict[str, Any]:
@@ -113,6 +143,7 @@ def _execute(target: pathlib.Path, item: dict[str, Any], choice: int, cfg: dict[
         "detail": detail,
         "reversible": True,  # all current ops are git-reversible; no original is deleted
         "originals_kept": originals_kept,
+        "scope": current_scope(target),  # which git branch/sha this decision belongs to (cross-scope guard)
     }
 
 
@@ -150,6 +181,7 @@ def cmd_auto(target: pathlib.Path) -> int:
             continue
         record = _execute(target, item, item.get("recommend", 0), cfg, by="agent", level=level)
         _append_audit(target, record)
+        _record_pattern(target, record)
         if record["applied"]:
             item["status"] = "resolved"
             resolved += 1
@@ -176,6 +208,7 @@ def cmd_item(target: pathlib.Path, item_id: str, choice: int) -> int:
         return 2
     record = _execute(target, item, choice, cfg, by="agent", level=policy.get("level", "assist"))
     _append_audit(target, record)
+    _record_pattern(target, record)
     if record["applied"]:
         item["status"] = "resolved"
     _save_queue(target, queue)
