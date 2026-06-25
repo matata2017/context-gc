@@ -16,17 +16,24 @@
 
 ## Quickstart
 
-1. **Install**: see [`INSTALL.md`](INSTALL.md)
+1. **Install**: see [`INSTALL.md`](INSTALL.md) — or just tell your agent "install context-gc"
 2. **Read the skill**: [`SKILL.md`](SKILL.md)
 3. **Try a demo**:
-   - [`examples/demo-doc-vs-config/`](examples/demo-doc-vs-config/) — README says port 8000, compose says 8080.
-   - [`examples/demo-agent-context-rot/`](examples/demo-agent-context-rot/) — SOUL references a dead skill and conflicting rate limits.
-   - [`examples/demo-kb-duplication/`](examples/demo-kb-duplication/) — the same deploy instruction is copied into README/docs/wiki.
-3. **Run the structural validator**:
+   - [`examples/demo-doc-vs-config/`](examples/demo-doc-vs-config/) — README says port 8000, compose says 8080
+   - [`examples/demo-sdd-drift/`](examples/demo-sdd-drift/) — SDD says password login, code/tests use OAuth device flow
+   - [`examples/demo-agent-context-rot/`](examples/demo-agent-context-rot/) — SOUL references a dead skill and conflicting rate limits
+   - [`examples/demo-agent-autonomy/`](examples/demo-agent-autonomy/) — agent auto-fixes port mismatch, escalates memory conflict
+   - [`examples/demo-hill-climb/`](examples/demo-hill-climb/) — 10 accumulated patterns → 2 clusters → 2 optimization proposals
+   - [`examples/demo-kb-duplication/`](examples/demo-kb-duplication/) — the same deploy instruction is copied into README/docs/wiki
+4. **Run the structural validator**:
    ```bash
    python scripts/validate_context_gc.py
    ```
-4. **Optional: install hooks** using [`examples/claude-settings-hooks.json`](examples/claude-settings-hooks.json). Hooks create dirty cards in `.context-gc/dirty.jsonl` and remind you to run MARK.
+5. **Run the offline eval fixtures**:
+   ```bash
+   python scripts/run_evals.py
+   ```
+6. **Optional: install hooks** using [`examples/claude-settings-hooks.json`](examples/claude-settings-hooks.json). Hooks create dirty cards in `.context-gc/dirty.jsonl`, remind you to run MARK, and can block unapproved sweeps.
 
 ## The problem
 
@@ -57,10 +64,27 @@ Full research notes and design rationale: [`research/context-gc-research.md`](re
 ## What it covers
 
 - **Docs & READMEs** — stale, contradictory, or orphaned claims
+- **SDD & specs** — design/spec text that diverged from code after requirement changes
 - **Configs** — local↔server drift, masked configs, fork-noted divergence
 - **Knowledge bases** — bloat, duplication, ever-growing append-only decay
-- **Agent context** — SOUL/CLAUDE.md/skills/memory context rot (stale instructions, conflicting rules, dead references, memory leak)
-- **A single session** — context rot within a long-running conversation
+- **Agent context** — SOUL/CLAUDE.md/skills/memory context rot (stale instructions, semantic conflicts, dead references, memory leak, skill bloat, tone drift)
+- **Agent memory layers** — long-term, mid-term, and profile memory that conflict or drift; `memory-condense` writes one current memory and keeps originals as evidence
+- **A single session** — transcript/session rot: superseded plans, orphaned TODOs, repeated decisions, and tool-output bloat
+- **Preventive Minor GC** — automated agents can periodically check dirty context and apply only pre-authorized safe fixes before drift spreads
+- **Layer 4 Hill Climbing** — accumulated patterns from successful resolutions feed back to improve drift detection automatically
+
+## Loop Engineering
+
+context-gc maps to the four-layer Loop Engineering architecture defined by LangChain (2026.06):
+
+| Layer | context-gc | Status |
+|---|---|---|
+| L1 Agent Loop | Sidecar — doesn't participate in agent orchestration | — |
+| L2 Verification | `gc_tick --gate` — deterministic checks + LLM review after every task | ✅ |
+| L3 Event-driven | hooks dirty-card → auto-MARK → gc_tick on interval | ✅ |
+| L4 Hill Climbing | `analyze_patterns.py` — clusters patterns, auto-suggests optimizations | ✅ |
+
+Full design: [`references/loop-engineering.md`](references/loop-engineering.md) · Architecture: [`references/architecture.md`](references/architecture.md)
 
 ## Usage (as a Claude Code skill)
 
@@ -79,9 +103,17 @@ Claude runs the **3-phase GC cycle**:
 3. **BARRIER** — writes/updates `SOURCES.md` (authority map for cheaper future runs)
 
 Optional hook integration turns this into an incremental GC: `PostToolUse` records dirty context
-files and `Stop` reminds you to run MARK before entropy accumulates. See
+files, `Stop` reminds you to run MARK before entropy accumulates, and optional `PreToolUse`
+guards block unapproved bulk sweeps. See
 [`references/hooks.md`](references/hooks.md) and
 [`examples/claude-settings-hooks.json`](examples/claude-settings-hooks.json).
+
+## Why not just use docs linters?
+
+Use them. `context-gc` is not a replacement for Vale, markdownlint, lychee, or project-specific
+checks. Those tools are scanners: they produce evidence during MARK. `context-gc` is the collector
+protocol around them: find roots, trace claims, confirm SWEEP, then record the root→copy map in
+`SOURCES.md` so the same drift is cheaper to catch next time.
 
 Read the full skill: [`SKILL.md`](SKILL.md)
 
@@ -89,36 +121,77 @@ Read the full skill: [`SKILL.md`](SKILL.md)
 
 ```
 context-gc/
+├── .editorconfig                    # Cross-platform text encoding and LF endings
 ├── .github/workflows/validate.yml   # GitHub Actions validation
+├── .claude/
+│   ├── settings.json                # PostToolUse ruff check hook (dev)
+│   └── skills/verify-gc/SKILL.md    # /verify-gc skill for contributors
+├── CLAUDE.md                        # Project instructions for Claude Code
 ├── SKILL.md                         # Full skill — GC cycle, safety rules, output formats
-├── README.md                        # This file
-├── INSTALL.md                       # Install, hooks, CI quick guide
+├── SOURCES.md                       # Dogfooded authority map for this repo
+├── README.md                        # This file (English)
+├── README.zh-CN.md                  # Chinese README
+├── INSTALL.md                       # Install guide — one-command, hooks, CI, any agent platform
+├── INSTALL_AGENT.md                 # Tell your agent to install — one paste
+├── CONTRIBUTING.md                  # Contributor workflow and validation commands
+├── install.py                       # One-command installer (curl ... | python3)
+├── pyproject.toml                   # ruff formatter/linter config
+├── evals/
+│   └── evals.json                   # 29 machine-readable eval scenarios
 ├── research/
-│   └── context-gc-research.md       # Sources and design recommendations
+│   ├── context-gc-research.md       # GC metaphor sources and design rationale
+│   └── loop-integration-plan.md     # Loop engine integration development plan
 ├── references/
-│   ├── gc-model.md                  # GC ↔ entropy mental model (must read once)
+│   ├── gc-model.md                  # GC ↔ entropy mental model
 │   ├── entropy-checklist.md         # Garbage taxonomy + detection methods
 │   ├── treatment-playbook.md        # Per-type sweep actions
-│   └── hooks.md                     # Optional Claude Code hook recipes
+│   ├── hooks.md                     # Optional Claude Code hook recipes
+│   ├── mcp-surface.md               # MCP tool surface design (deferred server)
+│   ├── architecture.md              # Architecture — Blackboard + Observer + Strategy + Sidecar
+│   └── loop-engineering.md          # context-gc × LangChain Loop Engineering 4 layers
 ├── scripts/
-│   └── context_gc_hook.py           # Hook helper: dirty cards + stop reminder
+│   ├── _common.py                   # Shared: context detection, autonomy policy, never_auto floor
+│   ├── context_gc_hook.py           # Hook helper: dirty cards, guards, reminders, auto-MARK, minor GC
+│   ├── init_context_gc.py           # Bootstrap SOURCES.md + config.yml + guided setup
+│   ├── mark.py                      # Mechanical MARK: docs/config/agent/memory drift candidates
+│   ├── minor_gc.py                  # Preventive Minor GC with pre-authorized safe fixers
+│   ├── review_queue.py              # Aggregate open decisions → review-queue.json
+│   ├── resolve.py                   # Agent self-resolve within autonomy policy + audit log
+│   ├── gc_tick.py                   # One governance tick — any loop/agent entry point
+│   ├── analyze_patterns.py          # Layer 4 hill climbing — cluster patterns, suggest optimizations
+│   ├── session_mark.py              # MARK exported transcripts for session context rot
+│   ├── run_evals.py                 # Offline eval fixture checker
+│   ├── validate_context_gc.py       # Structural validator + dogfood self-check
+│   ├── install.sh                   # One-command installer (Linux/macOS)
+│   ├── install.ps1                  # One-command installer (Windows PowerShell)
+│   └── adapters/
+│       └── hermes_adapter.py        # Hermes/Ralph loop integration (gate, emit-tasks, compact)
 ├── examples/
 │   ├── claude-settings-hooks.json   # Example .claude/settings.json hook config
-│   ├── demo-doc-vs-config/          # Stale README vs live docker-compose port
-│   ├── demo-agent-context-rot/      # Dead skill + conflicting agent instructions
-│   └── demo-kb-duplication/         # Same fact copied across README/docs/wiki
+│   ├── demo-doc-vs-config/         # Stale README vs live docker-compose port
+│   ├── demo-sdd-drift/             # SDD diverged from implementation after requirements changed
+│   ├── demo-agent-context-rot/     # Dead skill + conflicting agent instructions
+│   ├── demo-agent-drift-advanced/  # Semantic conflicts, memory leak, skill bloat, session rot
+│   ├── demo-minor-gc/              # Pre-authorized scalar-sync safe auto-fix
+│   ├── demo-memory-drift/          # memory-condense long/mid-term memory + profile drift
+│   ├── demo-review-queue/          # Pre-seeded review-queue fixture
+│   ├── demo-agent-autonomy/        # Agent self-resolve port mismatch, escalate memory conflict
+│   ├── demo-hill-climb/            # 10 patterns → 2 clusters → 2 optimization proposals
+│   └── demo-kb-duplication/        # Same fact copied across README/docs/wiki
 └── templates/
     └── SOURCES.md.template          # Authority map template (the write barrier)
 ```
 
 ## Development
 
+```bash
+python scripts/validate_context_gc.py
+python scripts/run_evals.py
 ```
-# Run a GC walk on the repo itself (eat your own dog food)
-  1. Run the MARK phase on this repo
-  2. Inspect the entropy report
-  3. Run SWEEP (with confirmation)
-```
+
+This repo dogfoods its own write barrier in [`SOURCES.md`](SOURCES.md). When changing the skill,
+hooks, demos, or GitHub metadata, update the matching authority-map entry if the root→copy
+relationship changes.
 
 ## License
 

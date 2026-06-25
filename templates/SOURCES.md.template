@@ -26,7 +26,15 @@ derived copies must match it, and how to re-check.
 - **Re-check:** `{{command, e.g. diff the copies, or grep for the value in root vs copy}}`
 - **Last verified:** {{date}}
 - **Last checked by:** {{human/agent/tool}}
-- **Status:** `{{SYNCED | DRIFTED | NOT_CHECKED | FORK | UNKNOWN_ROOT}}`
+- **Auto-fix:** `{{none | scalar-sync | pointer-copy | generated-state-cleanup | memory-condense}}` (optional; missing means report-only)
+- **Root extract:** `{{regex with one capture group for scalar-sync}}`
+- **Copy replace:** `{{regex that matches the stale scalar in each copy}}`
+- **Pointer text:** `{{replacement pointer text for pointer-copy}}`
+- **Memory subject:** `{{subject id for memory-condense, e.g. user-preference:verbosity}}`
+- **Memory target:** `{{path for the condensed current memory, e.g. memory/current/user-preference.md}}`
+- **Archive path:** `{{dir for superseded memory; only moved when memory_gc.allow_archive is true}}`
+- **Protected:** `{{true | false}}` — protected domains are never auto-edited by Minor GC
+- **Status:** `{{SYNCED | DRIFTED | NOT_CHECKED | FORK | HISTORICAL | UNKNOWN_ROOT}}`
 
 ---
 
@@ -39,3 +47,16 @@ derived copies must match it, and how to re-check.
 - **Re-check:** `diff <(yq . config/default.yaml) <(yq . config/prod.yaml)`
 - **Last verified:** YYYY-MM-DD
 - **Status:** SYNCED
+
+### Agent context entry (delete me)
+
+- **Root:** `CLAUDE.md` or `SOUL.md` (confirmed anchor for durable agent behavior)
+- **Owner:** agent maintainer
+- **Risk:** high — stale or conflicting agent context changes future tool choice and behavior
+- **Copies:**
+  - `skills/*/SKILL.md` — active skill contracts; must not contradict root instructions
+  - `memory/` — durable facts; compact dated variants and preserve history when relevant
+  - `session transcript` — transient heap; summarize durable decisions before compaction
+- **Re-check:** `python scripts/mark.py --target . && python scripts/session_mark.py --target . --transcript <export>`
+- **Last verified:** YYYY-MM-DD
+- **Status:** NOT_CHECKED

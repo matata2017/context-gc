@@ -1,12 +1,24 @@
 {
+  "_comment": "Replace ABSOLUTE_PATH_TO/context-gc with the real install path, e.g. /home/you/.claude/skills/context-gc or D:/context-gc. Relative paths break because hooks run from the target project's cwd, not the skill dir.",
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python ABSOLUTE_PATH_TO/context-gc/scripts/context_gc_hook.py sweep-guard"
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Write|Edit|MultiEdit",
         "hooks": [
           {
             "type": "command",
-            "command": "python scripts/context_gc_hook.py dirty-card"
+            "command": "python ABSOLUTE_PATH_TO/context-gc/scripts/context_gc_hook.py dirty-card"
           }
         ]
       }
@@ -17,7 +29,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python scripts/context_gc_hook.py stop-reminder"
+            "command": "python ABSOLUTE_PATH_TO/context-gc/scripts/context_gc_hook.py stop-reminder"
           }
         ]
       }

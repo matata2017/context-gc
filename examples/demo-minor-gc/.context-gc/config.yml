@@ -1,0 +1,24 @@
+scope:
+  include:
+    - "**/*.md"
+    - "**/*.yml"
+  exclude:
+    - ".context-gc/*"
+minor_gc:
+  enabled: true
+  interval_dirty_cards: 1
+  interval_turns: 1
+  apply_safe: true
+  max_files_per_run: 3
+  max_seconds: 5
+  allow_fixers:
+    - "scalar-sync"
+    - "pointer-copy"
+    - "generated-state-cleanup"
+  protected:
+    - "CLAUDE.md"
+    - "SOUL.md"
+    - "memory/**"
+    - "skills/**/SKILL.md"
+    - "docs/adr/**"
+    - "docs/sdd/**"

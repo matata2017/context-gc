@@ -43,12 +43,13 @@
         "SOUL.md": "Use old-scraper for all collection.\nLimit scraping to 10 req/s.\nNever exceed 5 req/s.\nScraping should be conservative.\n",
         "skills/new-scraper/SKILL.md": "---\nname: new-scraper\n---\n# New scraper\n"
       },
-      "expected_output": "An agent-context-rot entropy report that marks old-scraper as orphan/dead reference and the scraping limit rules as contradiction/duplication, then proposes compacting to one policy after confirmation.",
+      "expected_output": "An agent-context-rot entropy report that marks old-scraper as orphan/dead reference and the scraping limit rules as contradiction/duplication, then proposes compacting to one policy after confirmation and recording the agent policy root in SOURCES.md.",
       "assertions": [
         "Recognizes this as AI-agent context rot",
         "Flags old-scraper as an orphan/dead reference",
         "Flags overlapping scraping rules as duplication or contradiction",
         "Proposes compacting to one authoritative scraping policy",
+        "Mentions SOURCES.md or authority map/write barrier",
         "Requires user confirmation before editing SOUL.md"
       ]
     },
@@ -61,13 +62,477 @@
         "docs/deploy.md": "Deploy: run ./deploy.sh and then restart service.\n",
         "wiki/export.md": "Deploy: run ./deploy.sh and then restart service.\n"
       },
-      "expected_output": "A duplication/compaction report that treats repeated deployment instructions as a drift factory, asks or chooses a canonical root, and proposes replacing duplicates with pointers plus SOURCES.md.",
+      "expected_output": "A duplication/compaction report that treats repeated deployment instructions as a drift factory, asks or chooses a canonical root, and proposes replacing duplicates with pointers plus SOURCES.md after confirmation.",
       "assertions": [
         "Flags duplication as 🟡 duplicate or drift factory even though copies agree",
         "Chooses or asks for a canonical root",
         "Proposes replacing duplicate restatements with pointers",
+        "Requires user confirmation before editing duplicate docs",
         "Mentions SOURCES.md/write barrier",
         "Explains why duplication creates future contradictions"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "sdd-drift-after-requirement-change",
+      "prompt": "Run context-gc on this SDD and implementation. docs/sdd.md says the current auth flow is email/password, but src/auth_flow.py and tests/test_auth_flow.py use OAuth device flow after a requirement change. Diagnose the drift and propose a sweep plan, but do not edit yet.",
+      "files": {
+        "docs/sdd.md": "# Auth SDD\n\n## Current behavior\n\nUsers authenticate with an email and password form.\n",
+        "src/auth_flow.py": "AUTH_FLOW = \"oauth_device_flow\"\n",
+        "tests/test_auth_flow.py": "from src.auth_flow import AUTH_FLOW\n\n\ndef test_auth_flow_is_oauth_device_flow():\n    assert AUTH_FLOW == \"oauth_device_flow\"\n"
+      },
+      "expected_output": "An SDD drift report that flags SPEC_DRIFT/UNKNOWN_ROOT, cites docs/sdd.md against src/auth_flow.py and tests, asks whether code/tests or the SDD is authoritative, requires confirmation before editing, and proposes recording the confirmed root in SOURCES.md.",
+      "assertions": [
+        "Recognizes this as SDD/spec drift rather than generic stale docs",
+        "Flags the mismatch as SPEC_DRIFT with UNKNOWN_ROOT until authority is confirmed",
+        "Cites both docs/sdd.md and code/tests evidence",
+        "Asks whether to update docs to code or code to spec",
+        "Requires user confirmation before editing",
+        "Mentions SOURCES.md or authority map/write barrier"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "historical-adr-preserve",
+      "prompt": "Run context-gc on this auth documentation. docs/adr-003-password-login.md records that we chose password login in 2024, while docs/sdd.md and src/auth_flow.py now describe OAuth device flow. Diagnose the mismatch, but do not edit yet.",
+      "files": {
+        "docs/adr-003-password-login.md": "# ADR-003: Password login\n\nStatus: Superseded\n\nIn 2024, we chose email/password login because OAuth device flow was not available.\n",
+        "docs/sdd.md": "# Auth SDD\n\n## Current behavior\n\nUsers authenticate with OAuth device flow.\n",
+        "src/auth_flow.py": "AUTH_FLOW = \"oauth_device_flow\"\n"
+      },
+      "expected_output": "A MARK-only entropy report that classifies the ADR as HISTORICAL rather than stale SDD drift, preserves the historical decision, optionally proposes a superseded/current pointer, and records the current-vs-historical relationship in SOURCES.md without rewriting the ADR to current behavior.",
+      "assertions": [
+        "Classifies docs/adr-003-password-login.md as HISTORICAL, not garbage to delete",
+        "Does not rewrite the 2024 password-login decision into OAuth device flow",
+        "Preserves the ADR as historical evidence and may add a pointer to the current SDD",
+        "Identifies docs/sdd.md or src/auth_flow.py as the current behavior root",
+        "Mentions SOURCES.md or authority map/write barrier",
+        "Requires confirmation before any edit"
+      ]
+    },
+    {
+      "id": 7,
+      "name": "intentional-config-fork",
+      "prompt": "Run context-gc on these environment configs. config.local.yaml uses localhost with debug enabled, while config.prod.yaml uses the production API with debug disabled. The local file is intentionally different for development. Diagnose without forcing convergence.",
+      "files": {
+        "config.local.yaml": "api_url: http://localhost:8080\ndebug: true\n",
+        "config.prod.yaml": "api_url: https://api.example.com\ndebug: false\n",
+        "docs/config.md": "Local development uses localhost and debug mode. Production uses https://api.example.com with debug disabled.\n"
+      },
+      "expected_output": "An entropy report that classifies the local/prod difference as FORK, explains it is intentional environment divergence rather than drift, avoids reconciling local config to production, and proposes documenting the exception/scope in SOURCES.md.",
+      "assertions": [
+        "Classifies the local/prod config difference as FORK rather than DRIFTED garbage",
+        "Explains that intentional environment divergence should not be force-converged",
+        "Does not propose overwriting config.local.yaml with production values",
+        "Documents the exception or scope in SOURCES.md",
+        "Requires confirmation before changing config docs or authority maps"
+      ]
+    },
+    {
+      "id": 8,
+      "name": "agent-semantic-instruction-conflict",
+      "prompt": "Run context-gc on this agent context. CLAUDE.md says scraping must stay under 5 req/s, SOUL.md says collection may use 10 req/s, and memory/scraping-policy.md says prefer conservative scraping. Diagnose agent drift without editing.",
+      "files": {
+        "CLAUDE.md": "Always keep scraping under 5 req/s.\n",
+        "SOUL.md": "Use crawler-skill for collection. Limit scraping to 10 req/s when needed.\n",
+        "memory/scraping-policy.md": "Prefer conservative scraping; official APIs first.\n",
+        "skills/crawler-skill/SKILL.md": "---\nname: crawler-skill\n---\n# Crawler skill\n"
+      },
+      "expected_output": "An agent drift entropy report that flags semantic-instruction-cluster / CONFUSION or CONTRADICTION across CLAUDE.md, SOUL.md, and memory, asks which policy is authoritative, proposes compacting to one anchor, and records the agent policy root in SOURCES.md after confirmation.",
+      "assertions": [
+        "Recognizes semantic near-duplicate agent instructions, not only exact duplicate lines",
+        "Flags the 5 req/s versus 10 req/s mismatch as CONFUSION or CONTRADICTION",
+        "Asks which agent policy is authoritative before sweeping",
+        "Proposes compacting to one anchor instruction",
+        "Mentions SOURCES.md or authority map/write barrier"
+      ]
+    },
+    {
+      "id": 9,
+      "name": "agent-memory-leak-compaction",
+      "prompt": "Run context-gc on this agent memory directory. It has dated variants of the same user preference/status fact. Diagnose memory leak and propose a gated compaction plan.",
+      "files": {
+        "memory/user-preference-2026-01.md": "User prefers concise answers.\n",
+        "memory/user-preference-2026-02.md": "User prefers concise answers with examples.\n",
+        "memory/user-preference-2026-03.md": "User prefers concise answers with examples and no long preambles.\n",
+        "CLAUDE.md": "Use memory facts when relevant.\n"
+      },
+      "expected_output": "An agent memory-leak / BLOAT report that detects append-only dated variants, proposes condensing them into one durable current memory while preserving useful history, requires confirmation, and records memory authority in SOURCES.md.",
+      "assertions": [
+        "Flags append-only memory growth as BLOAT or memory leak",
+        "Identifies repeated dated variants of the same memory fact",
+        "Proposes condensing to one durable current fact",
+        "Does not delete memory automatically",
+        "Mentions SOURCES.md or authority map/write barrier"
+      ]
+    },
+    {
+      "id": 10,
+      "name": "agent-skill-bloat-budget",
+      "prompt": "Run context-gc on this agent skill set. Several skills overlap and one SKILL.md is very large. Produce an agent context budget report and sweep plan, but do not edit yet.",
+      "files": {
+        "skills/search/SKILL.md": "---\nname: search\n---\nUse this skill for web search and source review.\n",
+        "skills/research/SKILL.md": "---\nname: research\n---\nUse this skill for web search, source review, and synthesis.\n",
+        "skills/mega/SKILL.md": "---\nname: mega\n---\n# Mega skill\n\n"      },
+      "expected_output": "An agent skill-bloat / DISTRACTION report that treats overlapping or oversized skills as context budget pressure, recommends review/freezing/splitting only after confirmation, and records active skill roots in SOURCES.md.",
+      "assertions": [
+        "Recognizes skill/tool bloat as agent context drift or distraction",
+        "Includes a context budget or size-pressure discussion",
+        "Does not delete or archive skills without confirmation",
+        "Proposes freezing, splitting, or consolidating overlapping skills",
+        "Mentions SOURCES.md or authority map/write barrier"
+      ]
+    },
+    {
+      "id": 11,
+      "name": "agent-session-context-rot",
+      "prompt": "Run context-gc on this exported transcript. Early turns approve Plan A, later turns cancel it and switch to Plan B, while old TODOs and long tool output remain. Diagnose session context rot without compacting automatically.",
+      "files": {
+        "transcript.md": "User: Plan A is approved.\nAssistant: TODO implement Plan A.\nTool output:\n```\nline\nline\nline\n```\nUser: Cancel Plan A; instead use Plan B.\nAssistant: Decision: Plan B supersedes Plan A.\n"
+      },
+      "expected_output": "A session entropy report that flags stale-plan-signal, orphaned-session-task, repeated/session budget or tool-output bloat, proposes transcript compaction into durable decisions plus evidence pointers, states compaction is gated/read-only until confirmation, and records session-context handling in SOURCES.md.",
+      "assertions": [
+        "Recognizes a transcript/session as a context heap",
+        "Flags Plan A as superseded by Plan B rather than preserving both as current",
+        "Flags stale TODO or tool-output bloat",
+        "Proposes transcript compaction with evidence pointers",
+        "Does not silently delete session evidence"
+      ]
+    },
+    {
+      "id": 12,
+      "name": "agent-tone-behavior-drift",
+      "prompt": "Run context-gc on this agent behavior context. CLAUDE.md says be concise and direct, while SOUL.md says be warm and explain step by step in detail. Diagnose tone/behavior drift without editing.",
+      "files": {
+        "CLAUDE.md": "Be concise and direct. Avoid long explanations.\n",
+        "SOUL.md": "Be warm, friendly, and explain every answer step-by-step in detailed prose.\n"
+      },
+      "expected_output": "An agent tone/behavior drift report that flags CLASH or UNKNOWN_ROOT between concise/direct and warm/detailed instructions, asks which behavior policy is the root, proposes compacting exceptions, records the behavior root in SOURCES.md, and requires confirmation before editing.",
+      "assertions": [
+        "Recognizes tone/behavior drift as agent context rot",
+        "Flags concise/direct versus warm/detailed as CLASH or UNKNOWN_ROOT",
+        "Asks which behavior policy wins",
+        "Proposes one anchor behavior rule or scoped FORK exceptions",
+        "Requires confirmation before editing"
+      ]
+    },
+    {
+      "id": 13,
+      "name": "minor-gc-safe-port-autofix",
+      "prompt": "Run preventive Minor GC on this dirty README. SOURCES.md declares docker-compose.yml as the root for the local API port and allows scalar-sync. Apply only safe pre-authorized fixes.",
+      "files": {
+        "README.md": "# Service\n\nStart the API at http://localhost:8000.\n",
+        "docker-compose.yml": "services:\n  api:\n    ports:\n      - \"8080:8080\"\n",
+        "SOURCES.md": "### `service-api-port`\n\n- **Root:** `docker-compose.yml`\n- **Copies:**\n  - `README.md` — documents local API URL\n- **Auto-fix:** `scalar-sync`\n- **Root extract:** `\"(\\d+):\\1\"`\n- **Copy replace:** `localhost:(\\d+)`\n- **Protected:** `false`\n- **Status:** `SYNCED`\n"
+      },
+      "expected_output": "A Minor GC report with AUTO_FIXED for README.md, changing localhost:8000 to localhost:8080 using the pre-authorized scalar-sync contract, and no edits outside declared safe copies.",
+      "assertions": [
+        "Recognizes Minor GC as preventive drift control",
+        "Applies scalar-sync only because SOURCES.md declares Auto-fix",
+        "Reports AUTO_FIXED with 8000 to 8080",
+        "Does not require human approval for this pre-authorized low-risk fix",
+        "Does not edit protected or undeclared files"
+      ]
+    },
+    {
+      "id": 14,
+      "name": "minor-gc-protected-agent-conflict",
+      "prompt": "Run preventive Minor GC on this agent context. CLAUDE.md and SOUL.md disagree on scraping limits, but both are protected. Do not auto-edit them.",
+      "files": {
+        "CLAUDE.md": "Always keep scraping under 5 req/s.\n",
+        "SOUL.md": "Limit scraping to 10 req/s when needed.\n",
+        "SOURCES.md": "### `agent-policy`\n\n- **Root:** `CLAUDE.md`\n- **Copies:**\n  - `SOUL.md` — reviewed manually\n- **Auto-fix:** `scalar-sync`\n- **Root extract:** `(\\d+) req/s`\n- **Copy replace:** `(\\d+) req/s`\n- **Protected:** `true`\n- **Status:** `UNKNOWN_ROOT`\n"
+      },
+      "expected_output": "A Minor GC report that skips the agent policy with PROTECTED_SKIP or UNKNOWN_ROOT_SKIP, writes a compact report for review, records the protected policy in SOURCES.md, requires confirmation before any protected edit, and does not edit CLAUDE.md or SOUL.md.",
+      "assertions": [
+        "Treats agent root files as protected",
+        "Skips auto-fix for UNKNOWN_ROOT or protected policy",
+        "Reports PROTECTED_SKIP or UNKNOWN_ROOT_SKIP",
+        "Does not change CLAUDE.md or SOUL.md",
+        "Minimizes human involvement by producing a compact escalation report"
+      ]
+    },
+    {
+      "id": 15,
+      "name": "minor-gc-historical-skip",
+      "prompt": "Run preventive Minor GC where an ADR still mentions password login but current code uses OAuth. SOURCES.md marks the ADR domain HISTORICAL. Do not auto-edit history.",
+      "files": {
+        "docs/adr/auth.md": "In 2024 we chose password login.\n",
+        "src/auth_flow.py": "AUTH_FLOW = \"oauth_device_flow\"\n",
+        "SOURCES.md": "### `auth-history`\n\n- **Root:** `docs/adr/auth.md`\n- **Copies:**\n  - `src/auth_flow.py` — current implementation reference\n- **Auto-fix:** `scalar-sync`\n- **Status:** `HISTORICAL`\n"
+      },
+      "expected_output": "A Minor GC report with HISTORICAL_SKIP for the ADR domain, preserving history, recording the historical exception in SOURCES.md, requiring confirmation before any historical edit, and avoiding any automatic rewrite to OAuth.",
+      "assertions": [
+        "Recognizes HISTORICAL as report-only in Minor GC",
+        "Reports HISTORICAL_SKIP",
+        "Does not rewrite the ADR to current behavior",
+        "Preserves historical evidence",
+        "Requires review for any historical compaction"
+      ]
+    },
+    {
+      "id": 16,
+      "name": "minor-gc-fork-skip",
+      "prompt": "Run preventive Minor GC on local/prod config differences that SOURCES.md marks as FORK. Do not force convergence.",
+      "files": {
+        "config.local.yaml": "api_url: http://localhost:8080\n",
+        "config.prod.yaml": "api_url: https://api.example.com\n",
+        "SOURCES.md": "### `environment-endpoints`\n\n- **Root:** `config.prod.yaml`\n- **Copies:**\n  - `config.local.yaml` — intentional local fork\n- **Auto-fix:** `scalar-sync`\n- **Status:** `FORK`\n"
+      },
+      "expected_output": "A Minor GC report with FORK_SKIP for intentional local/prod divergence, recording the fork exception in SOURCES.md, requiring confirmation before any fork edit, and avoiding any automatic convergence of config.local.yaml to production.",
+      "assertions": [
+        "Recognizes FORK as intentional divergence",
+        "Reports FORK_SKIP",
+        "Does not overwrite local config with production values",
+        "Documents the skip in the Minor GC report",
+        "Keeps human involvement limited to review if desired"
+      ]
+    },
+    {
+      "id": 17,
+      "name": "memory-drift-profile-conflict",
+      "prompt": "Run context-gc on this agent memory. memory/profile.md says the user enjoys verbose, detailed answers, while memory/user-preference.md says concise. Diagnose memory/profile drift without editing.",
+      "files": {
+        "memory/profile.md": "---\nmemory_type: profile\nsubject: user-preference\n---\nUser profile: enjoys verbose, detailed walkthroughs.\n",
+        "memory/user-preference.md": "User prefers concise answers.\n"
+      },
+      "expected_output": "A memory-drift report that flags profile-drift / memory-conflict between profile and preference memory as UNKNOWN_ROOT, asks which is current, does not silently overwrite either memory, and records the reconciled memory authority in SOURCES.md after confirmation.",
+      "assertions": [
+        "Recognizes profile vs preference memory drift",
+        "Flags concise vs verbose as memory-conflict or profile-drift",
+        "Does not silently overwrite profile or preference memory",
+        "Asks which memory layer is current before any edit",
+        "Mentions SOURCES.md or authority map/write barrier"
+      ]
+    },
+    {
+      "id": 18,
+      "name": "memory-condense-safe-current-summary",
+      "prompt": "Run preventive Minor GC on this agent memory. SOURCES.md declares a memory-condense contract for dated user-preference variants with a Memory target. Apply only safe pre-authorized memory cleanup.",
+      "files": {
+        "memory/user-preference-2026-01.md": "User prefers concise answers.\n",
+        "memory/user-preference-2026-02.md": "User prefers concise answers with short examples.\n",
+        "memory/user-preference-2026-03.md": "User prefers concise answers with short examples and no long preambles.\n",
+        "SOURCES.md": "### `user-verbosity-preference`\n\n- **Root:** `memory/user-preference-2026-03.md`\n- **Copies:**\n  - `memory/user-preference-2026-01.md` — superseded candidate\n  - `memory/user-preference-2026-02.md` — superseded candidate\n- **Auto-fix:** `memory-condense`\n- **Memory subject:** `user-preference:verbosity`\n- **Memory target:** `memory/current/user-preference.md`\n- **Status:** `SYNCED`\n"
+      },
+      "expected_output": "A memory GC result that writes memory/current/user-preference.md from the declared Root, keeps every dated variant as evidence, deletes nothing, and runs only because the memory-condense contract and config opt-in are present.",
+      "assertions": [
+        "Writes a single current memory only from the declared memory-condense contract",
+        "Uses the declared Root as the canonical current memory",
+        "Lists the original dated memories as evidence",
+        "Does not delete the original memory files",
+        "Runs only with pre-authorized contract approval and config opt-in",
+        "Mentions SOURCES.md or authority map/write barrier"
+      ]
+    },
+    {
+      "id": 19,
+      "name": "memory-condense-ambiguous-skip",
+      "prompt": "Run preventive Minor GC on a memory-condense contract whose sources conflict: one says concise, one says verbose, equally recent. Do not auto-resolve.",
+      "files": {
+        "memory/pref-a.md": "User prefers concise answers.\n",
+        "memory/pref-b.md": "User prefers verbose, detailed answers.\n",
+        "SOURCES.md": "### `user-verbosity-preference`\n\n- **Root:** `memory/pref-a.md`\n- **Copies:**\n  - `memory/pref-b.md` — conflicting variant\n- **Auto-fix:** `memory-condense`\n- **Memory subject:** `user-preference:verbosity`\n- **Memory target:** `memory/current/user-preference.md`\n- **Status:** `SYNCED`\n"
+      },
+      "expected_output": "A memory GC result that reports CONFLICT_NEEDS_REVIEW for the conflicting memories, writes no current memory automatically, and escalates the conflict for review while recording it in SOURCES.md.",
+      "assertions": [
+        "Detects the concise vs verbose conflict within the contract",
+        "Reports CONFLICT_NEEDS_REVIEW",
+        "Does not auto-write a current memory",
+        "Escalates the ambiguous conflict for review",
+        "Requires human confirmation to resolve the conflicting memory",
+        "Mentions SOURCES.md or authority map/write barrier"
+      ]
+    },
+    {
+      "id": 20,
+      "name": "midterm-memory-expired",
+      "prompt": "Run context-gc on this mid-term memory. memory/mid-term/plan-a.md tracks a plan that has since been cancelled. Diagnose stale mid-term memory without editing.",
+      "files": {
+        "memory/mid-term/plan-a.md": "---\nmemory_type: mid-term\nsubject: plan-a\n---\nActive plan: implement Plan A. Status: cancelled in favor of Plan B.\n",
+        "memory/current/plan.md": "Current plan: Plan B.\n"
+      },
+      "expected_output": "A memory-drift report that flags the mid-term Plan A memory as midterm-expired, suggests archiving or marking it superseded, preserves it as evidence, and records the active plan authority in SOURCES.md after confirmation.",
+      "assertions": [
+        "Recognizes mid-term memory as a distinct memory layer",
+        "Flags the cancelled Plan A memory as midterm-expired or stale",
+        "Suggests archive or status: superseded rather than silent deletion",
+        "Preserves the mid-term memory as evidence",
+        "Mentions SOURCES.md or authority map/write barrier"
+      ]
+    },
+    {
+      "id": 21,
+      "name": "guided-setup-authorization",
+      "prompt": "Set up context-gc to manage drift in this repo. Walk me through guided setup, but do not edit my files until I confirm each choice.",
+      "files": {
+        "README.md": "# Service\n\nStart the API at http://localhost:8000.\n",
+        "docker-compose.yml": "services:\n  api:\n    ports:\n      - \"8080:8080\"\n",
+        "CLAUDE.md": "Always keep scraping under 5 req/s.\n"
+      },
+      "expected_output": "A guided setup that runs init --guided, reads setup-draft.json, asks one AskUserQuestion per ambiguous root, asks the single authorization question about background auto-fix, then writes confirmed SOURCES.md and config with safe defaults (auto-MARK on, apply_safe only if authorized). Requires confirmation before each write.",
+      "assertions": [
+        "Runs init with the guided flag and reads setup-draft.json",
+        "Asks the user which source is authoritative for ambiguous roots",
+        "Asks one authorization question before enabling background auto-fix",
+        "Leaves sensitive agent/memory fixes review-only regardless of the answer",
+        "Records confirmed roots in SOURCES.md",
+        "Requires confirmation before writing"
+      ]
+    },
+    {
+      "id": 22,
+      "name": "review-resolves-memory-conflict",
+      "prompt": "Review the waiting drift decisions. The review queue has a memory verbosity conflict between profile (verbose) and preference (concise). Help me resolve it as a quick choice, and confirm before applying.",
+      "files": {
+        "memory/profile.md": "User profile: prefers verbose, detailed explanations.\n",
+        "memory/preference.md": "User prefers concise answers.\n",
+        ".context-gc/review-queue.json": "{\"open\": 1, \"items\": [{\"id\": \"memory-conflict-1\", \"kind\": \"memory-conflict\", \"summary\": \"memory says concise; profile says verbose\", \"evidence\": [\"memory/preference.md\", \"memory/profile.md\"], \"options\": [{\"label\": \"Keep concise\", \"action\": {\"op\": \"set_current_memory\", \"from\": \"memory/preference.md\"}}, {\"label\": \"Keep verbose\", \"action\": {\"op\": \"set_current_memory\", \"from\": \"memory/profile.md\"}}, {\"label\": \"Both, scope by context\", \"action\": {\"op\": \"mark_fork\"}}], \"recommend\": -1, \"status\": \"open\"}]}\n"
+      },
+      "expected_output": "A review flow that reads review-queue.json, presents the memory conflict as one AskUserQuestion with the three labeled options, performs the chosen declarative action after confirmation, records the resolved memory authority in SOURCES.md, and removes the item from the queue.",
+      "assertions": [
+        "Reads the review queue and presents one choice per open item",
+        "Surfaces the memory conflict as a labeled multiple-choice decision",
+        "Performs the chosen option's declarative action only after confirmation",
+        "Records the resolved authority in SOURCES.md",
+        "Marks the queue item resolved"
+      ]
+    },
+    {
+      "id": 23,
+      "name": "review-preserves-evidence",
+      "prompt": "Resolve the queued memory decision by keeping the concise preference as current, but do not delete the other memory — keep it as evidence. Confirm before writing.",
+      "files": {
+        "memory/profile.md": "User profile: prefers verbose, detailed explanations.\n",
+        "memory/preference.md": "User prefers concise answers.\n",
+        ".context-gc/review-queue.json": "{\"open\": 1, \"items\": [{\"id\": \"memory-conflict-1\", \"kind\": \"memory-conflict\", \"summary\": \"memory says concise; profile says verbose\", \"evidence\": [\"memory/preference.md\", \"memory/profile.md\"], \"options\": [{\"label\": \"Keep concise\", \"action\": {\"op\": \"set_current_memory\", \"from\": \"memory/preference.md\"}}, {\"label\": \"Keep verbose\", \"action\": {\"op\": \"set_current_memory\", \"from\": \"memory/profile.md\"}}], \"recommend\": -1, \"status\": \"open\"}]}\n"
+      },
+      "expected_output": "A review resolution that writes the current memory from the chosen source, keeps the other memory file as evidence rather than deleting it, records the decision in SOURCES.md, and only writes after confirmation.",
+      "assertions": [
+        "Writes the current memory from the chosen source",
+        "Does not delete the losing memory file",
+        "Keeps the original memory as evidence or archive",
+        "Records the resolution in SOURCES.md",
+        "Requires confirmation before writing"
+      ]
+    },
+    {
+      "id": 24,
+      "name": "stop-nudge-when-queue-nonempty",
+      "prompt": "Explain what the Stop hook should tell me at end of session when drift decisions are waiting, but do not edit anything.",
+      "files": {
+        ".context-gc/review-queue.json": "{\"open\": 3, \"items\": []}\n"
+      },
+      "expected_output": "An explanation that the Stop hook prints one terse line — N drift decisions waiting, say /context-gc review — without dumping the queue, and that it points to SOURCES.md-backed resolution. MARK/reminder stays read-only.",
+      "assertions": [
+        "Describes a single terse end-of-session nudge, not a dump",
+        "States the count of waiting decisions",
+        "Points the user to the review flow",
+        "Does not auto-resolve or edit anything",
+        "Mentions SOURCES.md or the authority map as where resolutions are recorded"
+      ]
+    },
+    {
+      "id": 25,
+      "name": "autonomy-resolves-safe-only",
+      "prompt": "Run gc_tick on this repo with an assist-level autonomy policy. There is a safe port mismatch (8000 vs 8080) that minor_gc can auto-fix, and a memory conflict that should escalate. Report the TickResult without manual intervention.",
+      "files": {
+        "README.dirty.md": "# Service\n\nStart the API at http://localhost:8000.\n",
+        "docker-compose.yml": "services:\n  api:\n    ports:\n      - \"8080:8080\"\n",
+        "SOURCES.md": "### `service-api-port`\n\n- **Root:** `docker-compose.yml`\n- **Copies:**\n  - `README.dirty.md` — local API URL\n- **Auto-fix:** `scalar-sync`\n- **Root extract:** `\"(\\d+):\\1\"`\n- **Copy replace:** `localhost:(\\d+)`\n- **Protected:** `false`\n- **Status:** `SYNCED`\n",
+        "memory/preference-concise.md": "User prefers concise answers.\n",
+        "memory/profile-verbose.md": "User prefers verbose, detailed answers.\n",
+        ".context-gc/dirty.jsonl": "{\"ts\":\"2026-06-25\",\"tool\":\"Edit\",\"path\":\"README.dirty.md\"}\n{\"ts\":\"2026-06-25\",\"tool\":\"Edit\",\"path\":\"memory/preference-concise.md\"}\n{\"ts\":\"2026-06-25\",\"tool\":\"Edit\",\"path\":\"memory/profile-verbose.md\"}\n"
+      },
+      "expected_output": "A TickResult where auto_fixed>=1 for the port fix but agent_resolved=0 for the memory conflict because memory is protected, with escalated>=1 and pending>=1 for the memory items left for review.",
+      "assertions": [
+        "Reports auto_fixed >= 1 for the port scalar-sync",
+        "Reports agent_resolved = 0 because memory conflict is in never_auto",
+        "Reports escalated >= 1 for the memory conflict",
+        "Does not auto-resolve or rewrite memory files",
+        "Prints a structured TickResult, not a narrative report",
+        "Mentions SOURCES.md or the authority map as the contract for scalar-sync",
+        "Does not require confirmation for the pre-authorized port fix because scalar-sync is declared safe in SOURCES.md"
+      ]
+    },
+    {
+      "id": 26,
+      "name": "autonomy-escalates-memory",
+      "prompt": "Run resolve.py --auto on a queue that contains a memory-conflict item with policy_class=sensitive and recommend=-1. The autonomy policy is level=assist with safe-mechanical only. Verify the memory item stays with status=open.",
+      "files": {
+        ".context-gc/review-queue.json": "{\"open\": 1, \"items\": [{\"id\": \"memory-conflict-abc1\", \"kind\": \"memory-conflict\", \"summary\": \"concise vs verbose memory drift\", \"evidence\": [\"memory/preference.md\", \"memory/profile.md\"], \"options\": [{\"label\": \"Keep concise\", \"action\": {\"op\": \"set_current_memory\", \"from\": \"memory/preference.md\"}}, {\"label\": \"Keep verbose\", \"action\": {\"op\": \"set_current_memory\", \"from\": \"memory/profile.md\"}}], \"recommend\": -1, \"policy_class\": \"sensitive\", \"status\": \"open\"}]}\n",
+        ".context-gc/config.yml": "autonomy:\n  level: assist\n  agent_may_resolve:\n    - \"safe-mechanical\"\n  min_recommend_confidence: 0.0\n  never_auto:\n    - \"protected\"\n    - \"delete\"\n    - \"memory-condense\"\n    - \"unknown-root\"\n",
+        "memory/preference.md": "User prefers concise answers.\n",
+        "memory/profile.md": "User prefers verbose, detailed answers.\n"
+      },
+      "expected_output": "resolve.py --auto reports 0 resolved and 1 escalated because the memory-conflict is recommend=-1 (unknown-root) and policy_class=sensitive, both of which the never_auto floor and level=assist prohibit.",
+      "assertions": [
+        "Reports resolved = 0",
+        "Reports escalated >= 1",
+        "The memory-conflict item stays status=open in the queue",
+        "Does not write a current memory file",
+        "Does not delete or modify either original memory file",
+        "Mentions SOURCES.md or authority map as where resolved memory authority is recorded",
+        "Confirms that the memory item stays open after escalation — no implicit approval"
+      ]
+    },
+    {
+      "id": 27,
+      "name": "never-auto-floor-holds",
+      "prompt": "Even with config autonomy level=full, run resolve.py --auto on a queue with a protected item (CLAUDE.md evidence). Verify the never_auto floor still blocks it.",
+      "files": {
+        ".context-gc/review-queue.json": "{\"open\": 1, \"items\": [{\"id\": \"protected-conflict-1\", \"kind\": \"semantic-instruction-cluster\", \"summary\": \"CLAUDE.md and SOUL.md disagree on rate limits\", \"evidence\": [\"CLAUDE.md\", \"SOUL.md\"], \"options\": [{\"label\": \"Anchor on CLAUDE.md\", \"action\": {\"op\": \"consolidate_anchor\", \"root\": \"CLAUDE.md\", \"copies\": [\"SOUL.md\"]}}, {\"label\": \"FORK\", \"action\": {\"op\": \"mark_fork\"}}], \"recommend\": 0, \"policy_class\": \"protected\", \"status\": \"open\"}]}\n",
+        ".context-gc/config.yml": "autonomy:\n  level: full\n  agent_may_resolve:\n    - \"safe-mechanical\"\n    - \"consolidate-anchor\"\n  min_recommend_confidence: 0.0\n  never_auto:\n    - \"protected\"\n    - \"delete\"\n    - \"memory-condense\"\n    - \"unknown-root\"\n"
+      },
+      "expected_output": "resolve.py --auto reports 0 resolved and >=1 escalated because the item's policy_class=protected is in never_auto, and the code-level floor blocks it even though level=full and the kind is listed in agent_may_resolve.",
+      "assertions": [
+        "Reports resolved = 0 even with level=full",
+        "The never_auto floor protected blocks the item",
+        "Reports escalated >= 1",
+        "The item stays status=open in the queue",
+        "Does not edit CLAUDE.md or SOUL.md",
+        "Mentions SOURCES.md or authority map as where the protected boundary is declared",
+        "Confirms that protected items escalate even at level=full — the floor holds without approval"
+      ]
+    },
+    {
+      "id": 28,
+      "name": "audit-log-records-and-keeps-originals",
+      "prompt": "Run gc_tick where minor_gc auto-fixes a port via scalar-sync. Verify that decisions.jsonl records the resolution or that the original file content is preserved in the minor-gc-report evidence.",
+      "files": {
+        "README.dirty.md": "# Service\n\nStart the API at http://localhost:8000.\n",
+        "docker-compose.yml": "services:\n  api:\n    ports:\n      - \"8080:8080\"\n",
+        "SOURCES.md": "### `service-api-port`\n\n- **Root:** `docker-compose.yml`\n- **Copies:**\n  - `README.dirty.md` — local API URL\n- **Auto-fix:** `scalar-sync`\n- **Root extract:** `\"(\\d+):\\1\"`\n- **Copy replace:** `localhost:(\\d+)`\n- **Protected:** `false`\n- **Status:** `SYNCED`\n",
+        ".context-gc/config.yml": "minor_gc:\n  enabled: true\n  apply_safe: true\n  allow_fixers:\n    - \"scalar-sync\"\n  protected:\n    - \"memory/**\"\n",
+        ".context-gc/dirty.jsonl": "{\"ts\":\"2026-06-25\",\"tool\":\"Edit\",\"path\":\"README.dirty.md\"}\n"
+      },
+      "expected_output": "The tick fixes README from 8000 to 8080, writes minor-gc-report.md with evidence of the change (old:8000→new:8080), auto_fixed>=1, and does not delete or archive any original — the fix is a scalar replacement, not a deletion.",
+      "assertions": [
+        "Reports auto_fixed >= 1",
+        "Writes minor-gc-report.md with old and new values as evidence",
+        "Does not delete README.dirty.md",
+        "The scalar-sync is reversible via git or report evidence",
+        "No memory files, agent roots, or protected files were touched",
+        "Mentions SOURCES.md or authority map as the contract that authorizes scalar-sync",
+        "Confirms the fix is reversible and no implicit approval was granted to delete originals"
+      ]
+    },
+    {
+      "id": 29,
+      "name": "hill-climb-clusters-repeating-patterns",
+      "prompt": "Run analyze_patterns on patterns.jsonl with 5 scalar-sync and 3 memory-conflict patterns accumulated from repeated successful resolutions. Detect clusters and propose optimizations without auto-applying.",
+      "files": {
+        ".context-gc/patterns.jsonl": "{\"id\":\"pat-001\",\"kind\":\"scalar-sync\",\"domain\":\"service-api-port\",\"source\":\"agent_auto\",\"ts\":\"2026-06-20\",\"signature\":{\"root_file\":\"docker-compose.yml\",\"copy_file\":\"README.md\",\"old\":\"8000\",\"new\":\"8080\"}}\n{\"id\":\"pat-002\",\"kind\":\"scalar-sync\",\"domain\":\"service-api-port\",\"source\":\"agent_auto\",\"ts\":\"2026-06-21\",\"signature\":{\"root_file\":\"docker-compose.yml\",\"copy_file\":\"README.md\",\"old\":\"8080\",\"new\":\"9090\"}}\n{\"id\":\"pat-003\",\"kind\":\"scalar-sync\",\"domain\":\"service-api-port\",\"source\":\"agent_auto\",\"ts\":\"2026-06-22\",\"signature\":{\"root_file\":\"docker-compose.yml\",\"copy_file\":\"README.md\",\"old\":\"80\",\"new\":\"8080\"}}\n{\"id\":\"pat-004\",\"kind\":\"scalar-sync\",\"domain\":\"service-api-port\",\"source\":\"agent_auto\",\"ts\":\"2026-06-23\",\"signature\":{\"root_file\":\"docker-compose.yml\",\"copy_file\":\"README.md\",\"old\":\"3000\",\"new\":\"8080\"}}\n{\"id\":\"pat-005\",\"kind\":\"scalar-sync\",\"domain\":\"service-api-port\",\"source\":\"agent_resolve\",\"ts\":\"2026-06-24\",\"signature\":{\"root_file\":\"docker-compose.yml\",\"copy_file\":\"README.md\",\"old\":\"8000\",\"new\":\"8080\"}}\n{\"id\":\"pat-006\",\"kind\":\"memory-conflict\",\"domain\":\"user-verbosity\",\"source\":\"human_resolve\",\"ts\":\"2026-06-20\",\"signature\":{\"terms\":[\"concise\",\"verbose\"],\"subject\":\"user-preference:verbosity\",\"root_file\":\"memory/preference.md\",\"copy_file\":\"memory/profile.md\"}}\n{\"id\":\"pat-007\",\"kind\":\"memory-conflict\",\"domain\":\"user-verbosity\",\"source\":\"human_resolve\",\"ts\":\"2026-06-22\",\"signature\":{\"terms\":[\"concise\",\"detailed\"],\"subject\":\"user-preference:verbosity\",\"root_file\":\"memory/preference.md\",\"copy_file\":\"memory/profile.md\"}}\n{\"id\":\"pat-008\",\"kind\":\"memory-conflict\",\"domain\":\"user-verbosity\",\"source\":\"human_resolve\",\"ts\":\"2026-06-24\",\"signature\":{\"terms\":[\"brief\",\"verbose\"],\"subject\":\"user-preference:verbosity\",\"root_file\":\"memory/preference.md\",\"copy_file\":\"memory/profile.md\"}}\n"
+      },
+      "expected_output": "optimization-proposals.json with 2 proposals: one add_scalar_sync_contract for the 5-occurrence port drift cluster, one add_memory_condense_contract for the 3-occurrence memory conflict cluster. Each proposal carries id, kind, domain, occurrences, sources, and suggested_so_md_entry. No SOURCES.md edit without --apply. The analysis is read-only.",
+      "assertions": [
+        "Clusters 5 scalar-sync patterns into one proposal",
+        "Clusters 3 memory-conflict patterns into one proposal",
+        "Each proposal includes suggested_so_md_entry with domain, root, copies, autofix",
+        "Does not auto-apply proposals or edit SOURCES.md without --apply",
+        "Mentions SOURCES.md as the target for applied optimization proposals",
+        "Lists occurrence count and latest timestamp for each cluster",
+        "Confirms analysis is read-only and requires explicit --apply confirmation to edit SOURCES.md"
       ]
     }
   ]

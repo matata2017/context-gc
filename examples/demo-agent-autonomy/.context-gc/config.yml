@@ -1,0 +1,43 @@
+scope:
+  include:
+    - "**/*.md"
+    - "**/*.yml"
+  exclude:
+    - ".context-gc/*"
+minor_gc:
+  enabled: true
+  interval_dirty_cards: 1
+  interval_turns: 1
+  apply_safe: true
+  max_files_per_run: 5
+  max_seconds: 5
+  allow_fixers:
+    - "scalar-sync"
+    - "pointer-copy"
+    - "generated-state-cleanup"
+    - "memory-condense"
+  protected:
+    - "CLAUDE.md"
+    - "SOUL.md"
+    - "memory/**"
+    - "skills/**/SKILL.md"
+    - "docs/adr/**"
+    - "docs/sdd/**"
+memory_gc:
+  enabled: true
+  allow_archive: false
+  max_files_per_run: 5
+  protected_subjects:
+    - "identity"
+    - "credentials"
+    - "legal"
+autonomy:
+  level: assist
+  agent_may_resolve:
+    - "safe-mechanical"
+  min_recommend_confidence: 0.0
+  never_auto:
+    - "protected"
+    - "delete"
+    - "memory-condense"
+    - "unknown-root"

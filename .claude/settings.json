@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -c \"import sys,json,subprocess,pathlib; d=json.load(sys.stdin); p=d.get('tool_input',{}).get('file_path') or d.get('tool_response',{}).get('filePath',''); pathlib.Path(p).suffix=='.py' and subprocess.run(['ruff','check',p], cwd=pathlib.Path(p).parent) or None\" 2>/dev/null || true",
+            "timeout": 30,
+            "statusMessage": "Running ruff check..."
+          }
+        ]
+      }
+    ]
+  }
+}

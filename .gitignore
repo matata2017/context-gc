@@ -1,3 +1,13 @@
 .context-gc/
 __pycache__/
 *.pyc
+
+# Demo fixtures intentionally ship a .context-gc config + seed inputs so the demo is reproducible.
+# Re-include only those fixture inputs; keep all generated runtime state ignored.
+!examples/*/.context-gc/
+examples/*/.context-gc/*
+!examples/*/.context-gc/config.yml
+!examples/*/.context-gc/dirty.jsonl
+# demo-review-queue ships seeded detection outputs so review_queue.py has something to aggregate.
+!examples/demo-review-queue/.context-gc/findings.json
+!examples/demo-review-queue/.context-gc/memory-gc.json

@@ -21,6 +21,9 @@ jobs:
       - name: Validate context-gc structure
         run: python scripts/validate_context_gc.py
 
+      - name: Validate eval fixtures
+        run: python scripts/run_evals.py
+
       - name: Check JSON formatting
         run: python -m json.tool evals/evals.json > /tmp/evals.json
 

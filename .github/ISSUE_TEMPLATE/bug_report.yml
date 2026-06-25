@@ -1,0 +1,43 @@
+name: Bug report
+description: Report incorrect context-gc behavior.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What did context-gc do incorrectly?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Include the prompt, relevant files, and command output.
+      placeholder: |
+        Prompt:
+        Files:
+        Command:
+        Output:
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should MARK, SWEEP, or BARRIER have produced?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Skill workflow
+        - Hook helper
+        - Eval fixture
+        - Documentation
+        - GitHub/CI
+    validations:
+      required: true

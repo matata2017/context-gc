@@ -1,0 +1,25 @@
+{
+  "target": "demo-review-queue",
+  "generated_at": "2026-06-25 00:00:00",
+  "dirty_only": false,
+  "files_scanned": 3,
+  "findings": [
+    {
+      "type": "memory-conflict",
+      "status": "UNKNOWN_ROOT",
+      "severity": "medium",
+      "files": ["memory/preference.md", "memory/profile.md"],
+      "detail": "memory subject `user-preference` contains potentially conflicting cues `concise` and `verbose`",
+      "needs_judgment": "Choose current truth or write uncertainty; do not silently overwrite profile or long-term memory."
+    },
+    {
+      "type": "sdd-drift",
+      "status": "UNKNOWN_ROOT",
+      "severity": "high",
+      "file": "docs/sdd.md",
+      "line": 5,
+      "detail": "docs/sdd.md says password login; code uses OAuth device flow after a requirement change",
+      "needs_judgment": "Decide whether the SDD is current intent, historical, or stale; do not assume code always wins."
+    }
+  ]
+}

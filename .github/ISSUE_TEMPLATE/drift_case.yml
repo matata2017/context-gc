@@ -1,0 +1,54 @@
+name: Drift or context-rot case
+description: Propose a new context-gc example, eval, or taxonomy case.
+title: "[Case]: "
+labels: ["case", "eval"]
+body:
+  - type: textarea
+    id: heap
+    attributes:
+      label: Heap in scope
+      description: Which docs, configs, knowledge-base files, or agent context files are involved?
+      placeholder: |
+        - README.md
+        - docker-compose.yml
+        - CLAUDE.md
+    validations:
+      required: true
+  - type: textarea
+    id: root
+    attributes:
+      label: Root or authority
+      description: What is the authoritative source? If unknown, say UNKNOWN_ROOT.
+    validations:
+      required: true
+  - type: dropdown
+    id: garbage_type
+    attributes:
+      label: Garbage type
+      options:
+        - CONTRADICTION
+        - SPEC_DRIFT
+        - WRONG
+        - STALE
+        - ORPHAN
+        - DUPLICATE
+        - BLOAT
+        - FORK
+        - HISTORICAL
+        - UNKNOWN_ROOT
+    validations:
+      required: true
+  - type: textarea
+    id: expected_mark
+    attributes:
+      label: Expected MARK output
+      description: What should the entropy report flag, with file/line evidence if possible?
+    validations:
+      required: true
+  - type: textarea
+    id: sweep_boundary
+    attributes:
+      label: Sweep boundary
+      description: Which edits would require explicit user approval?
+    validations:
+      required: true
