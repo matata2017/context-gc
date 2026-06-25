@@ -173,10 +173,11 @@ context-gc/
 ├── install.py                       # One-command installer (curl ... | python3)
 ├── pyproject.toml                   # ruff formatter/linter config
 ├── evals/
-│   └── evals.json                   # 29 machine-readable eval scenarios
+│   └── evals.json                   # 35 machine-readable eval scenarios (incl. 6 autonomous-trigger)
 ├── research/
 │   ├── context-gc-research.md       # GC metaphor sources and design rationale
-│   └── loop-integration-plan.md     # Loop engine integration development plan
+│   ├── loop-integration-plan.md     # Loop engine integration development plan
+│   └── skillopt-integration.md      # SkillOpt self-optimization + judge-variance lesson
 ├── references/
 │   ├── gc-model.md                  # GC ↔ entropy mental model
 │   ├── entropy-checklist.md         # Garbage taxonomy + detection methods
