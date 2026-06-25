@@ -5,7 +5,7 @@
 **Windows（PowerShell）：**
 
 ```powershell
-git clone https://github.com/<user>/context-gc.git $env:USERPROFILE\.claude\skills\context-gc
+git clone https://github.com/matata2017/context-gc.git $env:USERPROFILE\.claude\skills\context-gc
 cd <你的项目目录>
 python $env:USERPROFILE\.claude\skills\context-gc\scripts\init_context_gc.py --target . --guided --profile
 ```
@@ -13,7 +13,7 @@ python $env:USERPROFILE\.claude\skills\context-gc\scripts\init_context_gc.py --t
 **macOS / Linux：**
 
 ```bash
-git clone https://github.com/<user>/context-gc.git ~/.claude/skills/context-gc
+git clone https://github.com/matata2017/context-gc.git ~/.claude/skills/context-gc
 cd <你的项目>
 python ~/.claude/skills/context-gc/scripts/init_context_gc.py --target . --guided --profile
 ```

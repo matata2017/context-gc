@@ -1,10 +1,10 @@
 #!/bin/bash
 # context-gc 一键安装（Linux/macOS/Git Bash）
-# curl -sSL https://raw.githubusercontent.com/<user>/context-gc/main/install.sh | bash
+# curl -sSL https://raw.githubusercontent.com/matata2017/context-gc/main/install.sh | bash
 set -e
 
 SKILL_DIR="${HOME}/.claude/skills/context-gc"
-REPO="https://github.com/<user>/context-gc.git"  # TODO: 替换为真实地址
+REPO="https://github.com/matata2017/context-gc.git"
 TARGET="${1:-.}"
 
 echo "═══ context-gc 安装 ═══"

@@ -8,7 +8,7 @@
 安装 context-gc 到当前项目：
 
 1. 如果 ~/.claude/skills/context-gc 不存在：
-   git clone https://github.com/<user>/context-gc.git ~/.claude/skills/context-gc
+   git clone https://github.com/matata2017/context-gc.git ~/.claude/skills/context-gc
 
 2. 运行：
    python ~/.claude/skills/context-gc/scripts/init_context_gc.py --target . --guided --profile

@@ -2,7 +2,7 @@
 """context-gc 一键安装器——下载+安装+初始化，一条命令搞定。
 
 用法（用户只需要复制这一行到终端）：
-  curl -sSL https://raw.githubusercontent.com/<user>/context-gc/main/install.py | python3
+  curl -sSL https://raw.githubusercontent.com/matata2017/context-gc/main/install.py | python3
 
 或者让 agent 执行这一行。agent 会自动：
   1. 下载 context-gc 到 ~/.claude/skills/
@@ -16,7 +16,7 @@ import pathlib
 import subprocess
 import sys
 
-REPO = "https://github.com/<user>/context-gc.git"
+REPO = "https://github.com/matata2017/context-gc.git"
 SKILL_DIR = pathlib.Path.home() / ".claude" / "skills" / "context-gc"
 TARGET = pathlib.Path.cwd()
 

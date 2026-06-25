@@ -1,10 +1,10 @@
 # context-gc 一键安装（Windows PowerShell）
-# irm https://raw.githubusercontent.com/<user>/context-gc/main/install.ps1 | iex
+# irm https://raw.githubusercontent.com/matata2017/context-gc/main/install.ps1 | iex
 
 param(
     [string]$Target = ".",
     [string]$SkillDir = "$env:USERPROFILE\.claude\skills\context-gc",
-    [string]$Repo = "https://github.com/<user>/context-gc.git"
+    [string]$Repo = "https://github.com/matata2017/context-gc.git"
 )
 
 Write-Host "═══ context-gc 安装 ═══" -ForegroundColor Cyan
