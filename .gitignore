@@ -12,3 +12,4 @@ examples/*/.context-gc/*
 # demo-review-queue ships seeded detection outputs so review_queue.py has something to aggregate.
 !examples/demo-review-queue/.context-gc/findings.json
 !examples/demo-review-queue/.context-gc/memory-gc.json
+outputs/

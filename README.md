@@ -173,6 +173,7 @@ context-gc/
 │   ├── session_mark.py              # MARK exported transcripts for session context rot
 │   ├── mcp_server.py                # MCP stdio server — tick/resolve/review_queue/profile
 │   ├── eval_for_skillopt.py         # Auto-evaluator (static + LLM judge) for SkillOpt optimization
+│   ├── skillopt_optimize.py         # SkillOpt local optimization loop (rollout→reflect→gate)
 │   ├── run_evals.py                 # Offline eval fixture checker
 │   ├── validate_context_gc.py       # Structural validator + dogfood self-check
 │   ├── install.sh                   # One-command installer (Linux/macOS)

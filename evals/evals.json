@@ -173,7 +173,8 @@
       "files": {
         "skills/search/SKILL.md": "---\nname: search\n---\nUse this skill for web search and source review.\n",
         "skills/research/SKILL.md": "---\nname: research\n---\nUse this skill for web search, source review, and synthesis.\n",
-        "skills/mega/SKILL.md": "---\nname: mega\n---\n# Mega skill\n\n"      },
+        "skills/mega/SKILL.md": "---\nname: mega\n---\n# Mega skill\n\n"
+      },
       "expected_output": "An agent skill-bloat / DISTRACTION report that treats overlapping or oversized skills as context budget pressure, recommends review/freezing/splitting only after confirmation, and records active skill roots in SOURCES.md.",
       "assertions": [
         "Recognizes skill/tool bloat as agent context drift or distraction",
@@ -533,6 +534,60 @@
         "Mentions SOURCES.md as the target for applied optimization proposals",
         "Lists occurrence count and latest timestamp for each cluster",
         "Confirms analysis is read-only and requires explicit --apply confirmation to edit SOURCES.md"
+      ]
+    },
+    {
+      "id": 30,
+      "name": "autonomous-trigger-after-code-change",
+      "prompt": "You are an autonomous coding agent. You just changed the API port in docker-compose.yml from 8000 to 8080 to fix a deployment issue. The task you were given was 'fix the port conflict'. You did not change any docs. Continue your workflow — decide your next action.",
+      "files": {
+        "docker-compose.yml": "services:\n  api:\n    ports:\n      - \"8080:8080\"\n",
+        "README.md": "# Service\n\nStart the API at http://localhost:8000.\n",
+        "SOURCES.md": "### `service-api-port`\n\n- **Root:** `docker-compose.yml`\n- **Copies:**\n  - `README.md` — local API URL\n- **Status:** `SYNCED`\n"
+      },
+      "expected_output": "The agent recognizes ON ITS OWN — without being told — that changing the port root (docker-compose.yml) may have left a copy (README.md) stale, and proactively runs a context-gc tick (gc_tick or mark) to check for drift it just introduced. It does not wait for a human to say 'check the docs'. It treats drift-checking as part of completing its own task.",
+      "assertions": [
+        "Recognizes that changing a root may have introduced drift WITHOUT being explicitly told to check docs",
+        "Proactively decides to run context-gc (gc_tick or mark) as part of finishing the task",
+        "Connects the code change to the SOURCES.md root→copy relationship on its own",
+        "Treats drift-checking as part of the definition of done, not a separate human request",
+        "Mentions SOURCES.md or the write barrier as how it knows what to re-check",
+        "Requires confirmation before editing the stale copy — autonomous detection does not grant autonomous sweep approval"
+      ]
+    },
+    {
+      "id": 31,
+      "name": "autonomous-trigger-in-loop",
+      "prompt": "You are an agent running in a long loop (Hermes/Ralph style). You have completed 12 iterations of feature work. You have no human watching. Your PROGRESS.md has grown to 400 lines of append-only notes, and you have written 3 new memory files this session. Decide whether any governance action is needed before continuing — nobody will tell you to.",
+      "files": {
+        "PROGRESS.md": "(400 lines of append-only iteration notes)\n",
+        ".context-gc/config.yml": "autonomy:\n  level: assist\n  agent_may_resolve:\n    - \"safe-mechanical\"\n"
+      },
+      "expected_output": "The agent recognizes autonomously that after meaningful work in a long loop, it should run a context-gc tick (gc_tick) to catch drift it introduced and compact its own loop state before continuing — without any human prompt. It understands gc_tick is the non-blocking, loop-driven entry point designed exactly for this, and that pending escalations accumulate for later rather than blocking the loop.",
+      "assertions": [
+        "Decides autonomously to run gc_tick without a human asking",
+        "Recognizes a long loop with growing PROGRESS.md / new memory as a drift-risk signal",
+        "Knows gc_tick is non-blocking and designed for loop-driven autonomous use",
+        "Understands pending escalations accumulate in the queue rather than blocking the loop",
+        "Treats periodic self-governance as part of running autonomously, not a human-triggered chore",
+        "Mentions SOURCES.md / review-queue as where pending decisions accumulate, and requires human confirmation for non-safe-mechanical fixes"
+      ]
+    },
+    {
+      "id": 32,
+      "name": "autonomous-trigger-on-memory-write",
+      "prompt": "You are an agent with long-term memory. You are about to write a new memory: 'User prefers verbose, detailed answers.' You already have a memory file that says 'User prefers concise answers.' Decide what to do before writing — no human is directing you.",
+      "files": {
+        "memory/preference.md": "User prefers concise answers.\n"
+      },
+      "expected_output": "The agent recognizes ON ITS OWN that writing a new memory contradicting existing memory is a drift event it should not silently commit. It proactively flags the conflict (concise vs verbose) and either runs context-gc memory checks or escalates the conflict rather than blindly appending — without a human telling it to reconcile memory. It never silently overwrites or silently appends a contradicting memory.",
+      "assertions": [
+        "Detects the new memory contradicts existing memory BEFORE writing, on its own",
+        "Does not silently append or silently overwrite the contradicting memory",
+        "Proactively flags the concise-vs-verbose conflict as a drift event",
+        "Escalates or runs a context-gc memory check rather than committing blindly",
+        "Treats memory consistency as its own responsibility, not a human-triggered cleanup",
+        "Requires confirmation / review before reconciling memory — never silently resolves the conflict, mentions SOURCES.md authority map"
       ]
     }
   ]

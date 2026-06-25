@@ -91,13 +91,10 @@ def _score_static_eval(eval_item: dict, skill_text: str) -> dict:
     }
 
 
-def static_evaluate(skill_text: str) -> list[dict]:
-    """对所有 eval 运行静态评分。"""
-    evals = load_evals()
-    results = []
-    for ev in evals:
-        results.append(_score_static_eval(ev, skill_text))
-    return results
+def static_evaluate(skill_text: str, eval_subset: list[dict] | None = None) -> list[dict]:
+    """对一组 eval 运行静态评分。eval_subset=None 时跑全部。"""
+    evals = eval_subset if eval_subset is not None else load_evals()
+    return [_score_static_eval(ev, skill_text) for ev in evals]
 
 
 # -- LLM 后端（DeepSeek / Claude 自适应）-------------------------------------
@@ -205,9 +202,16 @@ def _call_claude(prompt: str, model: str, max_tokens: int, api_key: str) -> str:
     return ""
 
 
-def llm_evaluate(skill_text: str, model: str = "claude-sonnet-4-6", max_evals: int | None = None) -> list[dict]:
-    """对所有 eval 运行 LLM 评分。⚠️ 有成本——29 个 eval × ~$0.02/eval。"""
-    evals = load_evals()
+def llm_evaluate(skill_text: str, model: str = "claude-sonnet-4-6", max_evals: int | None = None,
+                 eval_subset: list[dict] | None = None, samples: int = 1) -> list[dict]:
+    """对一组 eval 运行 LLM 评分。⚠️ 有成本——每个 eval ~2*samples 次 LLM 调用。
+
+    eval_subset: 显式指定要跑的 eval 列表（优化器用，按 train/valid split 传入）；
+                 None 时跑全部（可用 max_evals 截断前 N 个）。
+    samples:     每个 eval 评分几次取共识（hard 多数票、soft 中位数）。LLM-as-judge 有方差，
+                 samples=1 的单次分会噪声很大，让优化变成赌运气；samples>=3 才让分数可信。
+    """
+    evals = eval_subset if eval_subset is not None else load_evals()
     if max_evals:
         evals = evals[:max_evals]
 
@@ -215,45 +219,53 @@ def llm_evaluate(skill_text: str, model: str = "claude-sonnet-4-6", max_evals: i
     for i, ev in enumerate(evals):
         name = ev["name"]
         print(f"  [{i+1}/{len(evals)}] {name}...", file=sys.stderr, flush=True, end=" ")
-
-        try:
-            # 1) 让 agent 回答
-            agent_prompt = _build_eval_prompt(ev, skill_text)
-            agent_response = _call_llm(agent_prompt, model, max_tokens=4096)
-
-            # 2) 让裁判评分
-            judge_prompt = _build_judge_prompt(ev, agent_response)
-            judge_response = _call_llm(judge_prompt, model, max_tokens=1024)
-
-            # 3) 解析裁判结果
-            try:
-                verdict = json.loads("{" + judge_response.strip().split("{", 1)[-1].rsplit("}", 1)[0] + "}")
-            except Exception:
-                # Fallback: 简单检查 agent 回复是否提到了期望输出中的关键词
-                expected = ev.get("expected_output", "")
-                keywords = expected.lower().split()
-                mention_hits = sum(1 for k in keywords if k in agent_response.lower())
-                soft = mention_hits / max(len(keywords), 1)
-                verdict = {
-                    "assertions_pass": [],
-                    "overall_pass": soft > 0.5,
-                    "partial_score": round(soft, 2),
-                    "explanation": "fallback keyword match",
-                }
-
-            hard = 1.0 if verdict.get("overall_pass", False) else 0.0
-            soft = round(verdict.get("partial_score", 0.0), 4)
-
-            results.append({"id": name, "hard": hard, "soft": soft})
-            print(f"hard={hard} soft={soft}", file=sys.stderr)
-
-        except Exception as exc:
-            print(f"ERROR: {exc}", file=sys.stderr)
-            results.append({"id": name, "hard": 0.0, "soft": 0.0})
-
-        time.sleep(0.5)  # 速率限制
+        hards: list[float] = []
+        softs: list[float] = []
+        for _ in range(max(1, samples)):
+            h, s = _score_one(ev, skill_text, model)
+            hards.append(h)
+            softs.append(s)
+            time.sleep(0.3)
+        # hard: 多数票（>=半数为 1 才算 1）；soft: 中位数（抗离群）
+        hard = 1.0 if sum(hards) * 2 >= len(hards) else 0.0
+        soft = round(_median(softs), 4)
+        results.append({"id": name, "hard": hard, "soft": soft})
+        tag = f"hard={hard} soft={soft}" + (f" (n={samples} hards={hards})" if samples > 1 else "")
+        print(tag, file=sys.stderr)
 
     return results
+
+
+def _median(xs: list[float]) -> float:
+    s = sorted(xs)
+    n = len(s)
+    if n == 0:
+        return 0.0
+    mid = n // 2
+    return s[mid] if n % 2 else (s[mid - 1] + s[mid]) / 2
+
+
+def _score_one(eval_item: dict, skill_text: str, model: str) -> tuple[float, float]:
+    """单次评分：agent 回答 → judge 打分 → (hard, soft)。"""
+    try:
+        agent_prompt = _build_eval_prompt(eval_item, skill_text)
+        agent_response = _call_llm(agent_prompt, model, max_tokens=4096)
+        judge_prompt = _build_judge_prompt(eval_item, agent_response)
+        judge_response = _call_llm(judge_prompt, model, max_tokens=1024)
+        try:
+            verdict = json.loads("{" + judge_response.strip().split("{", 1)[-1].rsplit("}", 1)[0] + "}")
+        except Exception:
+            # Fallback: agent 回复是否提到期望输出关键词
+            keywords = eval_item.get("expected_output", "").lower().split()
+            hits = sum(1 for k in keywords if k in agent_response.lower())
+            soft = hits / max(len(keywords), 1)
+            verdict = {"overall_pass": soft > 0.5, "partial_score": round(soft, 2)}
+        hard = 1.0 if verdict.get("overall_pass", False) else 0.0
+        soft = round(verdict.get("partial_score", 0.0), 4)
+        return hard, soft
+    except Exception as exc:
+        print(f"[score error: {exc}]", file=sys.stderr, end=" ")
+        return 0.0, 0.0
 
 
 # -- 聚合输出 ----------------------------------------------------------------
@@ -284,6 +296,8 @@ def main() -> int:
                     help="static = free offline term check | llm = Claude API judge")
     ap.add_argument("--model", default="claude-sonnet-4-6", help="model for LLM mode")
     ap.add_argument("--max-evals", type=int, default=None, help="limit evals (LLM mode)")
+    ap.add_argument("--samples", type=int, default=1,
+                    help="LLM mode: score each eval N times, take consensus (hard=majority, soft=median). Use >=3 to beat judge variance.")
     ap.add_argument("--skillopt-format", action="store_true",
                     help="output SkillOpt-compatible JSONL: {id, hard, soft} per line")
     args = ap.parse_args()
@@ -297,7 +311,7 @@ def main() -> int:
     if args.mode == "static":
         results = static_evaluate(skill_text)
     else:
-        results = llm_evaluate(skill_text, model=args.model, max_evals=args.max_evals)
+        results = llm_evaluate(skill_text, model=args.model, max_evals=args.max_evals, samples=args.samples)
 
     if args.skillopt_format:
         print_skillopt_format(results)
