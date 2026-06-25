@@ -1,5 +1,7 @@
 # context-gc
 
+[English](#context-gc) | [中文](README.zh-CN.md)
+
 > Garbage collection for docs & agent context — detects drift, staleness, contradictions,
 > duplication, and context rot; traces every fact to its authoritative source; then converges or
 > sweeps the garbage and leaves a `SOURCES.md` so future drift is caught early.

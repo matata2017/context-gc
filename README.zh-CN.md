@@ -1,5 +1,7 @@
 # context-gc
 
+[English](README.md) | [中文](README.zh-CN.md)
+
 > 文档与 Agent 上下文的垃圾回收——检测漂移、过时、矛盾、重复和上下文腐烂；追溯每条事实到权威来源；收敛或清除垃圾后留下 `SOURCES.md`，让未来的漂移尽早被发现。
 
 ```
