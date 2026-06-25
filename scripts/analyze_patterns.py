@@ -290,11 +290,82 @@ def cmd_apply(target: pathlib.Path, proposal_id: str) -> int:
     return 0
 
 
+def _candidate_eval(proposal: dict) -> dict:
+    """把一条 proposal 翻译成一个候选 eval（供 evol 闭环用）。
+
+    候选 eval 描述"agent 遇到这类反复出现的漂移该怎么处理"。它带门控元数据，但**绝不**自动进
+    evals.json——按 next-phase-design.md 的死命令：自动生成可以，自动合并不行。一个候选要进集合，
+    必须满足 (a) 跨 ≥2 scope (b) samples≥3 共识下 SKILL 稳定失败 (c) 人审一次。这里只产 (a) 的标记，
+    (b)(c) 由 evol 闭环的后续步骤把关。
+    """
+    kind = proposal.get("kind", "drift")
+    entry = proposal.get("action", {}).get("suggested_so_md_entry", {})
+    root = entry.get("root", "")
+    copies = entry.get("copies", [])
+    copy = copies[0] if copies else ""
+    occ = proposal.get("occurrences", 0)
+    scope_count = proposal.get("scope_count", 0)
+
+    return {
+        "candidate_id": f"evol-{proposal.get('id', kind)}",
+        "name": f"evol-{kind}-recurring",
+        "source": "evol",
+        "occurrences": occ,
+        "scope_count": scope_count,
+        # 门控元数据：闭环后续步骤读这些字段判断该不该让候选进集合
+        "gate": {
+            "cross_scope_ok": scope_count >= 2,         # (a) 跨分支重复才是真规律
+            "needs_consensus_check": True,               # (b) 待 samples≥3 验证 SKILL 是否真失败
+            "needs_human_review": True,                  # (c) 待人审 staging
+        },
+        "draft_eval": {
+            "prompt": f"You are an autonomous agent. context-gc has seen `{kind}` drift between `{root}` and `{copy}` recur {occ} time(s) across {scope_count} branch(es). You just touched `{root}` again. Decide what to do.",
+            "expected_output": f"The agent recognizes this is a recurring `{kind}` pattern (already seen {occ}x), proactively checks `{copy}` against `{root}` without being told, and proposes recording it as a SOURCES.md contract so the recurrence stops. Requires confirmation before any sweep.",
+            "assertions": [
+                f"Recognizes `{kind}` between `{root}` and `{copy}` as a recurring pattern",
+                "Proactively checks the copy against the root without being told",
+                "Proposes a SOURCES.md contract to stop the recurrence",
+                "Requires confirmation before editing; mentions SOURCES.md write barrier",
+            ],
+        },
+    }
+
+
+def cmd_emit_eval(target: pathlib.Path, min_occurrences: int) -> int:
+    """从重复 pattern 生成候选 eval → .context-gc/candidate-evals.json（只生成，不合并）。"""
+    proposals = analyze(target, min_occurrences)
+    candidates = [_candidate_eval(p) for p in proposals]
+    state = target / ".context-gc"
+    state.mkdir(exist_ok=True)
+    out = {
+        "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "target": target.name,
+        "candidate_count": len(candidates),
+        "note": "候选 eval，未进 evals.json。进集合需：跨≥2 scope + samples≥3 共识下 SKILL 稳定失败 + 人审。",
+        "candidates": candidates,
+    }
+    out_path = state / "candidate-evals.json"
+    out_path.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    if not candidates:
+        print(f"# evol · 无候选 eval（没有 pattern 重复 ≥ {min_occurrences} 次）")
+        return 0
+    ready = [c for c in candidates if c["gate"]["cross_scope_ok"]]
+    print(f"# evol · {len(candidates)} 个候选 eval（{len(ready)} 个已满足跨 scope 门槛）")
+    for c in candidates:
+        mark = "✓跨scope" if c["gate"]["cross_scope_ok"] else "·单scope"
+        print(f"  [{mark}] {c['name']}: 出现 {c['occurrences']}x / {c['scope_count']} 分支")
+    print(f"\n候选写入 {out_path.relative_to(target)} — 未进 evals.json（需共识验证 + 人审）")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Layer 4 Hill Climbing — analyze drift patterns and suggest optimizations")
     ap.add_argument("--target", default=".")
     ap.add_argument("--min-occurrences", type=int, default=3, help="minimum cluster size to generate a proposal (default: 3)")
     ap.add_argument("--apply", help="apply a specific proposal by ID")
+    ap.add_argument("--emit-eval", action="store_true",
+                    help="generate candidate evals from recurring patterns → candidate-evals.json (does NOT merge into evals.json)")
     ap.add_argument("--json-only", action="store_true", help="print only the proposals JSON path")
     args = ap.parse_args()
 
@@ -309,6 +380,10 @@ def main() -> int:
     # --apply: 应用一条建议
     if args.apply:
         return cmd_apply(target, args.apply)
+
+    # --emit-eval: 从重复 pattern 生成候选 eval（只生成不合并）
+    if args.emit_eval:
+        return cmd_emit_eval(target, args.min_occurrences)
 
     # 分析
     proposals = analyze(target, args.min_occurrences)

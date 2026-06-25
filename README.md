@@ -206,7 +206,8 @@ context-gc/
 │   ├── install.sh                   # One-command installer (Linux/macOS)
 │   ├── install.ps1                  # One-command installer (Windows PowerShell)
 │   └── adapters/
-│       └── hermes_adapter.py        # Hermes/Ralph loop integration (gate, emit-tasks, compact)
+│       ├── hermes_adapter.py        # Hermes/Ralph loop integration (gate, emit-tasks, compact)
+│       └── langgraph_adapter.py     # LangGraph verify-node template + gate (no langgraph dependency)
 ├── examples/
 │   ├── claude-settings-hooks.json   # Example .claude/settings.json hook config
 │   ├── demo-doc-vs-config/         # Stale README vs live docker-compose port
