@@ -171,13 +171,14 @@ context-gc/
 │   ├── gc_tick.py                   # One governance tick — any loop/agent entry point
 │   ├── analyze_patterns.py          # Layer 4 hill climbing — cluster patterns, suggest optimizations
 │   ├── session_mark.py              # MARK exported transcripts for session context rot
+│   ├── mcp_server.py                # MCP stdio server — tick/resolve/review_queue/profile
+│   ├── eval_for_skillopt.py         # Auto-evaluator (static + LLM judge) for SkillOpt optimization
 │   ├── run_evals.py                 # Offline eval fixture checker
 │   ├── validate_context_gc.py       # Structural validator + dogfood self-check
 │   ├── install.sh                   # One-command installer (Linux/macOS)
 │   ├── install.ps1                  # One-command installer (Windows PowerShell)
 │   └── adapters/
 │       └── hermes_adapter.py        # Hermes/Ralph loop integration (gate, emit-tasks, compact)
-│       └── mcp_server.py               # MCP stdio server — tick/resolve/review_queue/profile
 ├── examples/
 │   ├── claude-settings-hooks.json   # Example .claude/settings.json hook config
 │   ├── demo-doc-vs-config/         # Stale README vs live docker-compose port

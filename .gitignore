@@ -1,6 +1,7 @@
 .context-gc/
 __pycache__/
 *.pyc
+.omc/
 
 # Demo fixtures intentionally ship a .context-gc config + seed inputs so the demo is reproducible.
 # Re-include only those fixture inputs; keep all generated runtime state ignored.
