@@ -168,6 +168,7 @@ context-gc/
 │   ├── install.ps1                  # One-command installer (Windows PowerShell)
 │   └── adapters/
 │       └── hermes_adapter.py        # Hermes/Ralph loop integration (gate, emit-tasks, compact)
+│       └── mcp_server.py               # MCP stdio server — tick/resolve/review_queue/profile
 ├── examples/
 │   ├── claude-settings-hooks.json   # Example .claude/settings.json hook config
 │   ├── demo-doc-vs-config/         # Stale README vs live docker-compose port

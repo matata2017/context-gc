@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "context-gc": {
+      "command": "python",
+      "args": [
+        "ABSOLUTE_PATH_TO/context-gc/scripts/mcp_server.py",
+        "--project-dir",
+        "/path/to/your/project"
+      ]
+    }
+  }
+}
