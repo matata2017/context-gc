@@ -7,9 +7,11 @@ target directory so the skill can be installed once and pointed at any repositor
 from __future__ import annotations
 
 import fnmatch
+import json
 import pathlib
 import re
 import subprocess
+import time
 from typing import Iterable
 
 # Files that carry "facts" and therefore rot. Mirrors scripts/context_gc_hook.py on purpose; if you
@@ -184,6 +186,85 @@ def git_last_commit_epoch(target: pathlib.Path, rel: str) -> int | None:
         return int(val) if val else None
     except Exception:
         return None
+
+
+# --- State scope (branch / commit awareness) -------------------------------------------------
+# `.context-gc/` runtime state (dirty cards, patterns, decisions) is global on disk, but the facts
+# it records belong to a specific git branch + commit. When the branch changes, the working-tree
+# ground truth changes wholesale — old dirty cards point at files that may now be entirely different.
+# So context-gc records the scope it last ran under and detects when HEAD has moved out from under it.
+# This is the local-file analog of a LangGraph thread_id: state is meaningful only within its scope.
+
+def _git(target: pathlib.Path, *args: str) -> str | None:
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(target), *args],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            check=False,
+        )
+        val = out.stdout.strip()
+        return val or None
+    except Exception:
+        return None
+
+
+def is_git_repo(target: pathlib.Path) -> bool:
+    """True only inside a git work tree. No git, no branches → scope logic must not run at all."""
+    return _git(target, "rev-parse", "--is-inside-work-tree") == "true"
+
+
+def current_scope(target: pathlib.Path) -> dict:
+    """The git scope the working tree is in right now: branch + HEAD sha. None values if not a repo."""
+    return {
+        "branch": _git(target, "rev-parse", "--abbrev-ref", "HEAD"),
+        "head_sha": _git(target, "rev-parse", "HEAD"),
+    }
+
+
+def recorded_scope(target: pathlib.Path) -> dict | None:
+    """The scope context-gc last recorded for this target, or None if never recorded."""
+    path = target / ".context-gc" / "scope.json"
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def write_scope(target: pathlib.Path, scope: dict | None = None) -> dict | None:
+    """Record the current (or given) scope to .context-gc/scope.json. Returns what was written.
+
+    No-op (returns None) outside a git repo — there is no branch to scope against, so writing a
+    scope file would only add a meaningless all-None record.
+    """
+    if not is_git_repo(target):
+        return None
+    scope = scope if scope is not None else current_scope(target)
+    state = target / ".context-gc"
+    state.mkdir(exist_ok=True)
+    payload = {**scope, "recorded_at": time.strftime("%Y-%m-%d %H:%M:%S")}
+    (state / "scope.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    return payload
+
+
+def scope_changed(target: pathlib.Path) -> tuple[bool, dict | None, dict]:
+    """Has the git branch moved since context-gc last recorded scope?
+
+    Returns (changed, old_scope, new_scope). `changed` is True only when both scopes have a branch
+    and they differ — a fresh repo with no recorded scope, or a non-git target, is not a "change".
+    Branch is the unit (not sha): a new commit on the same branch is normal incremental work, but a
+    branch switch swaps the whole working-tree ground truth and invalidates old dirty cards.
+    """
+    if not is_git_repo(target):
+        return (False, None, {"branch": None, "head_sha": None})
+    new = current_scope(target)
+    old = recorded_scope(target)
+    if old is None or not new.get("branch") or not old.get("branch"):
+        return (False, old, new)
+    return (old["branch"] != new["branch"], old, new)
 
 
 # --- Agent autonomy policy -------------------------------------------------------------------

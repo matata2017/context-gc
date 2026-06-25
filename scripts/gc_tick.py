@@ -30,6 +30,9 @@ import subprocess
 import sys
 import time
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+from _common import is_git_repo, scope_changed, write_scope  # noqa: E402
+
 HERE = pathlib.Path(__file__).resolve().parent
 
 
@@ -64,6 +67,22 @@ def run_tick(target: pathlib.Path) -> dict:
     state = target / ".context-gc"
     state.mkdir(exist_ok=True)
     steps: dict[str, int] = {}
+
+    # 0) scope check — if the git branch moved since we last ran, the working-tree ground truth
+    # changed wholesale; old dirty cards point at files that may now be entirely different. Invalidate
+    # them BEFORE mark reads them, and record the new scope. (A new commit on the same branch is normal
+    # incremental work and is not treated as a scope change.) Outside a git repo there is no branch, so
+    # this whole step is skipped — non-git targets keep their dirty cards untouched.
+    scope_note = None
+    new_scope = None
+    if is_git_repo(target):
+        changed, old_scope, new_scope = scope_changed(target)
+        if changed:
+            dirty = state / "dirty.jsonl"
+            if dirty.exists():
+                dirty.unlink()
+            scope_note = f"branch {old_scope['branch']} → {new_scope['branch']}: stale dirty cards invalidated"
+        write_scope(target, new_scope)
 
     # 1) detect (read-only) — dirty-only so a loop tick is cheap.
     steps["mark"], _ = _run("mark.py", "--dirty-only", "--json-only", target=target)
@@ -110,6 +129,8 @@ def run_tick(target: pathlib.Path) -> dict:
         "pending": pending,                                      # open queue items
         "optimization_proposals": proposal_count,               # Layer 4 hill-climb suggestions
         "policy_level": resolve_summary.get("level", "assist"),
+        "scope": new_scope,                                      # git branch + HEAD this tick ran under
+        "scope_note": scope_note,                                # set when a branch switch invalidated stale state
         "steps_rc": steps,
         "audit": ".context-gc/decisions.jsonl",
         "queue": ".context-gc/review-queue.json",

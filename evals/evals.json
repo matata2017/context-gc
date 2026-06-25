@@ -678,6 +678,24 @@
         "Downgrades or discards the thin-evidence suspicion rather than sweeping it",
         "Confirms README is actually correct; requires evidence before flagging, mentions SOURCES.md"
       ]
+    },
+    {
+      "id": 38,
+      "name": "state-scope-branch-switch-invalidates",
+      "prompt": "You are an autonomous agent. You ran context-gc on branch `main` and it recorded dirty cards for README.md and config.yaml. Then you switched to branch `feature-x` (a different branch where those files have different content). Now you are about to run context-gc again. Decide whether the dirty cards from `main` are still valid on `feature-x`.",
+      "files": {
+        ".context-gc/scope.json": "{\"branch\": \"main\", \"head_sha\": \"abc123\", \"recorded_at\": \"2026-06-26 10:00:00\"}\n",
+        ".context-gc/dirty.jsonl": "{\"ts\":\"2026-06-26\",\"tool\":\"Edit\",\"path\":\"README.md\"}\n{\"ts\":\"2026-06-26\",\"tool\":\"Edit\",\"path\":\"config.yaml\"}\n",
+        "README.md": "# feature-x version of the readme\n"
+      },
+      "expected_output": "The agent recognizes that a branch switch (main -> feature-x) changes the working-tree ground truth wholesale: the dirty cards recorded on `main` point at file states that may no longer exist on `feature-x`. It invalidates the stale dirty cards before running mark (so mark does not check feature-x files against main's dirty records), records the new scope (feature-x), and re-marks fresh on the new branch. It does not blindly reuse main's dirty cards on feature-x. gc_tick does this automatically by comparing recorded scope vs current git branch.",
+      "assertions": [
+        "Recognizes the branch switch changed the working-tree ground truth wholesale",
+        "Invalidates the stale dirty cards from main before marking on feature-x",
+        "Records the new scope (feature-x) so future ticks compare against it",
+        "Does not blindly reuse main's dirty cards on a different branch",
+        "Treats a branch switch as a scope change, not normal incremental work; mentions SOURCES.md / re-MARK and requires confirmation before any sweep on the new branch"
+      ]
     }
   ]
 }
