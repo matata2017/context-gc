@@ -177,7 +177,8 @@ context-gc/
 ├── research/
 │   ├── context-gc-research.md       # GC metaphor sources and design rationale
 │   ├── loop-integration-plan.md     # Loop engine integration development plan
-│   └── skillopt-integration.md      # SkillOpt self-optimization + judge-variance lesson
+│   ├── skillopt-integration.md      # SkillOpt self-optimization + judge-variance lesson
+│   └── next-phase-design.md         # State scope + evol loop + orchestrator adapters (design)
 ├── references/
 │   ├── gc-model.md                  # GC ↔ entropy mental model
 │   ├── entropy-checklist.md         # Garbage taxonomy + detection methods
