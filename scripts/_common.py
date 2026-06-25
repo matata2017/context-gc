@@ -33,6 +33,8 @@ DEFAULT_EXCLUDES = [
     ".context-gc/*",
     "dist/*",
     "build/*",
+    "outputs/*",
+    "*/outputs/*",
     "*/.git/*",
     "*/node_modules/*",
     "*/.venv/*",

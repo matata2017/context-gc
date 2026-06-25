@@ -96,7 +96,9 @@ def _load_excludes(target: pathlib.Path) -> list[str]:
                 excludes.append(s[2:].strip().strip('"'))
             elif s and not s.startswith("#") and not line.startswith(" "):
                 break
-    return excludes or DEFAULT_EXCLUDES
+    # Merge config excludes ON TOP of the defaults — never drop the baseline (.git, node_modules,
+    # outputs, etc.). A user adding one custom exclude must not silently lose all built-in ones.
+    return sorted(set(DEFAULT_EXCLUDES) | set(excludes))
 
 
 def _dirty_files(target: pathlib.Path, excludes: list[str]) -> list[pathlib.Path]:
