@@ -714,6 +714,25 @@
         "Does not auto-rewrite the doc; surfaces it for judgment",
         "Mentions SOURCES.md root->copy declaration as how it knew which doc to re-check"
       ]
+    },
+    {
+      "id": 40,
+      "name": "excludes-dependency-cache-dirs",
+      "prompt": "Run context-gc on a repo that has a .bun/install/cache/gbrain/CHANGELOG.md (a package-manager cache from an installed tool) alongside the project's own README.md and docs/. Decide what is in scope for drift checking.",
+      "files": {
+        ".bun/install/cache/gbrain/CHANGELOG.md": "# changelog\nrefers to ./missing-file.md\n",
+        "README.md": "# My Project\n",
+        "docs/guide.md": "Setup guide.\n"
+      },
+      "expected_output": "context-gc treats .bun/install/cache/** as a dependency cache (third-party tool state), NOT project context, and excludes it from scanning entirely. The orphan reference inside the cached CHANGELOG is not the user's drift and must not be surfaced. Only the project's own files (README.md, docs/) are in scope. This holds at any nesting depth — dependency/cache/build dir names (.bun, node_modules, .cache, vendor, dist, ...) are excluded wherever they appear in the path.",
+      "assertions": [
+        "Excludes .bun/install/cache/** as a dependency cache, not project context",
+        "Does not surface orphan/drift candidates from inside the cached third-party files",
+        "Scans only the project's own files (README.md, docs/)",
+        "Excludes by directory name at any depth, not just top level",
+        "Mentions SOURCES.md / scope as defining what the project actually owns",
+        "Marks the project SOURCES.md entries NOT_CHECKED and requires confirmation before any sweep — never auto-edits files inside dependency caches"
+      ]
     }
   ]
 }

@@ -41,6 +41,19 @@ DEFAULT_EXCLUDES = [
     "*/__pycache__/*",
 ]
 
+# Directory names that are NEVER project context — dependency caches, build output, vendored deps,
+# tool state. If ANY path segment is one of these, the file is excluded at any depth. This is more
+# robust than per-pattern globs: a real Hermes run surfaced 3202 files / 342 noise candidates because
+# .bun's deep cache (.bun/install/cache/.../CHANGELOG.md) slipped past node_modules-only excludes.
+EXCLUDED_DIR_NAMES = {
+    ".git", ".hg", ".svn",
+    "node_modules", ".pnpm", ".yarn", "bower_components", "vendor",
+    ".venv", "venv", "env", "__pycache__", ".tox", ".mypy_cache", ".pytest_cache", ".ruff_cache",
+    ".bun", ".npm", ".cache", ".cargo", ".gradle", ".m2", ".nuget", ".cocoapods", "Pods",
+    "dist", "build", "out", "target", ".next", ".nuxt", ".svelte-kit", ".turbo", ".parcel-cache",
+    ".context-gc", "outputs", ".terraform", ".serverless", "coverage", ".idea", ".vscode",
+}
+
 
 def is_context_path(rel: str) -> bool:
     p = pathlib.PurePath(rel.replace("\\", "/"))
@@ -172,6 +185,9 @@ def rough_token_count(text: str) -> int:
 
 def _excluded(rel: str, excludes: list[str]) -> bool:
     rel = rel.replace("\\", "/")
+    # Fast path: any path segment that is a known dependency/cache/build dir → excluded at any depth.
+    if EXCLUDED_DIR_NAMES.intersection(rel.split("/")):
+        return True
     return any(fnmatch.fnmatch(rel, pat) for pat in excludes)
 
 
