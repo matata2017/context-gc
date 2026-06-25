@@ -488,6 +488,56 @@ def check_stale(target: pathlib.Path, files: list[pathlib.Path]) -> list[dict]:
     return sorted(findings, key=lambda f: f["file"])[:25]
 
 
+CODE_SUFFIXES = {".py", ".js", ".ts", ".go", ".rs", ".java", ".rb", ".c", ".cpp", ".sh", ".php"}
+
+
+def check_spec_drift_candidates(target: pathlib.Path) -> list[dict]:
+    """SPEC_DRIFT trigger — when a code root commits AFTER a doc that describes it, prompt judgment.
+
+    The blind spot this fills: "the doc says X, the code now does Y" is real drift the mechanical
+    checks (value/link/duplicate) cannot see — it needs reading code + reading prose + judging whether
+    they agree. context-gc designs that as a JUDGMENT step, but nothing TRIGGERED it. This connects the
+    two: it reads SOURCES.md's declared root→copy pairs, and when a CODE root is git-newer than a DOC
+    copy that documents it, it raises a NEEDS_JUDGMENT candidate — NOT a mechanical verdict of drift,
+    but a prompt: "the code moved, go re-check whether this doc still describes it." Reuses the existing
+    SOURCES.md declaration + git mtime; adds no new heuristic that could false-positive on content.
+    """
+    src = target / "SOURCES.md"
+    if not src.exists():
+        return []
+    try:
+        import minor_gc
+        domains = minor_gc.parse_sources(src)
+    except Exception:
+        return []
+    findings = []
+    for domain in domains:
+        root = (domain.root or "").strip()
+        if not root or pathlib.PurePath(root).suffix.lower() not in CODE_SUFFIXES:
+            continue  # only code roots: doc-vs-code drift, not doc-vs-doc
+        if domain.status in {"FORK", "HISTORICAL", "UNKNOWN_ROOT"}:
+            continue  # those are deliberate or unresolved; don't nag
+        root_epoch = git_last_commit_epoch(target, root)
+        if root_epoch is None:
+            continue
+        for copy in domain.copies:
+            copy = copy.strip()
+            if pathlib.PurePath(copy).suffix.lower() not in {".md", ".mdx"}:
+                continue  # only doc copies need the "still accurate?" judgment
+            copy_epoch = git_last_commit_epoch(target, copy)
+            if copy_epoch is None or root_epoch <= copy_epoch:
+                continue  # doc is same-age-or-newer → presumed in sync
+            findings.append({
+                "type": "spec-drift-candidate",
+                "status": "NEEDS_JUDGMENT",
+                "severity": "medium",
+                "file": copy,
+                "detail": f"code root `{root}` committed after this doc; the doc may describe stale behavior",
+                "needs_judgment": f"Read `{root}` and `{copy}`: does the doc still accurately describe what the code does? This is a prompt to judge, not a verdict — only update after confirming a real mismatch.",
+            })
+    return findings
+
+
 SEV_ICON = {"high": "🔴", "medium": "🟡", "low": "🟢"}
 
 
@@ -540,6 +590,7 @@ def main() -> int:
         check_orphans(target, files)
         + check_duplicates(target, files)
         + check_stale(target, files)
+        + check_spec_drift_candidates(target)
         + check_dead_skill_refs(target, agent_files)
         + check_agent_instruction_clusters(target, agent_files)
         + check_memory_leak(target, agent_files)

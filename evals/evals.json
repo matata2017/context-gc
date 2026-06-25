@@ -696,6 +696,24 @@
         "Does not blindly reuse main's dirty cards on a different branch",
         "Treats a branch switch as a scope change, not normal incremental work; mentions SOURCES.md / re-MARK and requires confirmation before any sweep on the new branch"
       ]
+    },
+    {
+      "id": 39,
+      "name": "spec-drift-candidate-code-newer-than-doc",
+      "prompt": "Run context-gc. SOURCES.md declares scripts/hook.py as the root for hook behavior, with INSTALL.md as a doc copy describing it. scripts/hook.py was committed AFTER INSTALL.md (the code changed, the doc did not). Decide what to surface.",
+      "files": {
+        "SOURCES.md": "### `hook-behavior`\n\n- **Root:** `scripts/hook.py`\n- **Copies:**\n  - `INSTALL.md` — describes the hook behavior\n- **Status:** `SYNCED`\n",
+        "scripts/hook.py": "def hook():\n    # now does five things\n    pass\n",
+        "INSTALL.md": "The hook does four things.\n"
+      },
+      "expected_output": "context-gc raises a spec-drift-candidate with status NEEDS_JUDGMENT for INSTALL.md: the code root committed after the doc, so the doc may describe stale behavior. Crucially this is a PROMPT TO JUDGE, not a mechanical verdict of drift — the agent must read both scripts/hook.py and INSTALL.md and confirm a real mismatch before any edit. It does not auto-rewrite the doc; it surfaces the doc for human/agent judgment because doc-describes-X-but-code-does-Y is a judgment-level drift the mechanical value/link/duplicate checks cannot see.",
+      "assertions": [
+        "Raises a spec-drift-candidate / NEEDS_JUDGMENT for INSTALL.md because the code root is git-newer",
+        "Treats it as a prompt to judge, not a mechanical verdict of drift",
+        "Requires reading both the code root and the doc and confirming a real mismatch before editing",
+        "Does not auto-rewrite the doc; surfaces it for judgment",
+        "Mentions SOURCES.md root->copy declaration as how it knew which doc to re-check"
+      ]
     }
   ]
 }

@@ -27,6 +27,12 @@ An SDD/spec/design document was once authoritative, but later requirement change
 or config changes moved the implementation away from it.
 - **Detect:** compare load-bearing spec claims against current code, tests, config, API schemas, and
   latest decision docs. Watch words like "must", "shall", "current", "planned", and "future".
+- **Mechanical trigger (not verdict):** `mark.py`'s `spec-drift-candidate` check reads SOURCES.md's
+  declared root→copy pairs and, when a **code root** is git-newer than a **doc copy** that documents
+  it, raises a `NEEDS_JUDGMENT` candidate — a prompt to go read both and judge, never an auto-verdict.
+  This catches "the doc says X, the code now does Y" (e.g. the INSTALL.md hook-count drift), which the
+  value/link/duplicate checks structurally cannot see. The mechanical half only *triggers* the
+  judgment; the agent/human still decides whether it is real.
 - **Why high:** agents often treat SDD as root context. A stale spec can pull future edits back
   toward an obsolete design.
 - **Root decision:** do not automatically let code win. Classify the claim as current fact, future
