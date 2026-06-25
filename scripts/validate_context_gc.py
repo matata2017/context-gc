@@ -59,8 +59,8 @@ def main() -> int:
     if data.get("skill_name") != "context-gc":
         fail("evals.json must have skill_name=context-gc")
     evals = data.get("evals")
-    if not isinstance(evals, list) or len(evals) < 35:
-        fail("evals.json must contain at least 35 evals")
+    if not isinstance(evals, list) or len(evals) < 37:
+        fail("evals.json must contain at least 37 evals")
     for e in evals:
         for key in ("id", "name", "prompt", "expected_output", "assertions"):
             if key not in e:
