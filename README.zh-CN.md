@@ -15,7 +15,13 @@
 
 ## 快速开始
 
-1. **安装**：见 [`INSTALL.md`](INSTALL.md)
+1. **安装**：[`install.py`](install.py) 一条命令搞定：
+
+   ```bash
+   curl -sSL https://raw.githubusercontent.com/matata2017/context-gc/main/install.py | python3
+   ```
+
+   或者把 [这段话](INSTALL_AGENT.md) 发给你的 agent——它自己会装。完整选项：[`INSTALL.md`](INSTALL.md)
 2. **阅读 skill**：[`SKILL.md`](SKILL.md)
 3. **试试 demo**：
    - [`examples/demo-doc-vs-config/`](examples/demo-doc-vs-config/) — README 写端口 8000，compose 实际是 8080

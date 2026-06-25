@@ -18,7 +18,16 @@
 
 ## Quickstart
 
-1. **Install**: see [`INSTALL.md`](INSTALL.md) — or just tell your agent "install context-gc"
+1. **Install**: [`install.py`](install.py) does it all:
+
+   ```bash
+   # 一条命令安装
+   curl -sSL https://raw.githubusercontent.com/matata2017/context-gc/main/install.py | python3
+   ```
+
+   Or tell your agent: ["install context-gc"](INSTALL_AGENT.md) — it reads the guide and does it itself.
+
+   Full options: [`INSTALL.md`](INSTALL.md)
 2. **Read the skill**: [`SKILL.md`](SKILL.md)
 3. **Try a demo**:
    - [`examples/demo-doc-vs-config/`](examples/demo-doc-vs-config/) — README says port 8000, compose says 8080
