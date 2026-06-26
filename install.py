@@ -11,7 +11,6 @@
 """
 from __future__ import annotations
 
-import os
 import pathlib
 import subprocess
 import sys
@@ -63,8 +62,8 @@ def main():
     print(f"  python {SKILL_DIR / 'scripts' / 'gc_tick.py'} --target . --quiet")
     print()
     print("告诉你的 agent：")
-    print(f'  "检查下文档有没有漂移"')
-    print(f'  "跑一次 context-gc"')
+    print('  "检查下文档有没有漂移"')
+    print('  "跑一次 context-gc"')
     print()
     print("自检验证（可选）：")
     print(f"  python {SKILL_DIR / 'scripts' / 'validate_context_gc.py'}")
