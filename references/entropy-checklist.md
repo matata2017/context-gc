@@ -129,3 +129,16 @@ repeating itself, follows an old plan, or carries huge tool output forward.
 - **Repeated decision:** the same settled fact appears across many turns → compact to one durable statement.
 - **Tool-output bloat:** large command/log output remains after its result is settled → replace with pointer + one-line outcome.
 - **Session budget pressure:** transcript dominates useful context → compact transcript, preserving evidence and unresolved questions.
+
+## Meta-drift — the authority map itself drifts (治理地图自身漂移)
+
+The deepest blind spot: context-gc can only govern what `SOURCES.md` declares, but the map is written
+once and silently goes stale as files are added. A governable doc that nobody declared is invisible to
+every other check — it can rot freely. Symptom seen in practice: INSTALL_AGENT.md, install.py, and the
+Chinese README each slipped through one at a time until someone *felt* the gap.
+
+- **Coverage gap:** a top-level / onboarding file (README*, INSTALL*, CLAUDE.md, install.*) is not a
+  root or copy in any SOURCES domain → `mark.py`'s `coverage-gap` check flags it `NEEDS_JUDGMENT`:
+  *should this be governed, under which root?* A prompt to complete the map, not a verdict. The fix for
+  "X wasn't detected" is not to patch X by hand (whack-a-mole) but to let undeclared files surface
+  themselves. Narrow on purpose — only governable top-level docs, not internal demo/reference files.

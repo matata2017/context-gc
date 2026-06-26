@@ -12,10 +12,11 @@ when a root or copy changes, re-check the declared relationship before publishin
 - **Risk:** high — stale workflow text changes how Claude collects context garbage
 - **Copies:**
   - `README.md` — public summary; must match the three-phase MARK/SWEEP/BARRIER contract
+  - `README.zh-CN.md` — Chinese README; must stay in sync with README.md
   - `research/context-gc-research.md` — rationale; may expand the model but must not contradict the contract
 - **Re-check:** `python scripts/validate_context_gc.py`
-- **Last verified:** 2026-06-24
-- **Last checked by:** Codex
+- **Last verified:** 2026-06-26
+- **Last checked by:** Claude
 - **Status:** `SYNCED`
 
 ---
@@ -85,4 +86,35 @@ when a root or copy changes, re-check the declared relationship before publishin
 - **Re-check:** `python scripts/validate_context_gc.py && python scripts/run_evals.py`
 - **Last verified:** 2026-06-24
 - **Last checked by:** Codex
+- **Status:** `SYNCED`
+
+---
+
+### `project-agent-instructions` — how Claude works in THIS repo
+
+- **Root:** `CLAUDE.md` (project instructions loaded into every Claude Code session here)
+- **Owner:** maintainer
+- **Risk:** medium — stale instructions change how the agent treats this repo (commands, safety rules)
+- **Copies:** (none — this is a root-only authority; if its rules get echoed elsewhere, declare them here)
+- **Re-check:** `python scripts/validate_context_gc.py`
+- **Last verified:** 2026-06-26
+- **Last checked by:** Claude (surfaced by context-gc's own coverage-gap check)
+- **Status:** `SYNCED`
+
+---
+
+### `install-flow` — how users/agents install and bootstrap context-gc
+
+- **Root:** `scripts/init_context_gc.py` (the actual install/bootstrap behavior — CLI flags, what it writes)
+- **Owner:** maintainer
+- **Risk:** medium — if these docs advertise a wrong command/flag/URL, install fails for new users
+- **Copies:**
+  - `INSTALL.md` — full install guide; commands must match init's real flags
+  - `INSTALL_AGENT.md` — the paste-to-agent install snippet; its `init` command must stay valid
+  - `install.py` — one-command installer; repo URL + init invocation must be current
+  - `scripts/install.sh` — Linux/macOS installer; same
+  - `scripts/install.ps1` — Windows installer; same
+- **Re-check:** `python scripts/init_context_gc.py --help` (compare flags against what the docs claim)
+- **Last verified:** 2026-06-26
+- **Last checked by:** Claude (surfaced by context-gc's own coverage-gap check)
 - **Status:** `SYNCED`

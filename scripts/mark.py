@@ -538,6 +538,73 @@ def check_spec_drift_candidates(target: pathlib.Path) -> list[dict]:
     return findings
 
 
+# Top-level, user-facing docs that SHOULD be in the governance map. A file matching one of these and
+# NOT declared in any SOURCES.md domain is a coverage gap — the map itself drifted. Deliberately
+# narrow: only install/onboarding/top-level docs, not every .md (demos, references, research are
+# internal and would be noise). This is the meta-check: is the authority map itself complete?
+GOVERNABLE_TOPLEVEL = re.compile(
+    r"^(README[^/]*\.md|INSTALL[^/]*\.md|CONTRIBUTING\.md|CLAUDE\.md|SOUL\.md|AGENTS?\.md"
+    r"|install\.(py|sh|ps1)|scripts/install\.(sh|ps1))$",
+    re.I,
+)
+
+
+def check_coverage_gaps(target: pathlib.Path) -> list[dict]:
+    """Meta-check — find context files the authority map (SOURCES.md) forgot to declare.
+
+    The systemic problem behind a string of one-off blind spots (INSTALL_AGENT.md, install.py, the
+    Chinese README all slipped through): context-gc can only govern what SOURCES.md declares, but the
+    map is hand-written once and silently goes out of date as files are added. This is meta-drift —
+    the governance map drifts from the set of files that actually need governing.
+
+    Rather than patch each undeclared file by hand (whack-a-mole), this surfaces them: any top-level /
+    onboarding doc that is NOT a root or copy in any SOURCES domain is flagged NEEDS_JUDGMENT —
+    "should this be governed, and under which root?". A prompt to complete the map, not a verdict.
+    Narrow on purpose (GOVERNABLE_TOPLEVEL) so it points at real gaps, not internal demo/reference files.
+    """
+    src = target / "SOURCES.md"
+    if not src.exists():
+        return []
+    try:
+        import minor_gc
+        domains = minor_gc.parse_sources(src)
+    except Exception:
+        return []
+    declared = set()
+    for d in domains:
+        if d.root:
+            declared.add(d.root.strip().rstrip("/"))
+        for c in d.copies:
+            declared.add(c.strip())
+    findings = []
+    for rel_path in sorted(_governable_toplevel_files(target)):
+        if rel_path in declared:
+            continue
+        findings.append({
+            "type": "coverage-gap",
+            "status": "NEEDS_JUDGMENT",
+            "severity": "low",
+            "file": rel_path,
+            "detail": "a top-level/onboarding file not declared in any SOURCES.md domain — outside the governance map",
+            "needs_judgment": f"Should `{rel_path}` be governed? If yes, declare it as a copy of the right root (e.g. install docs → init_context_gc.py; README variants → SKILL.md). If it genuinely needs no governance, leave it — this is a prompt, not a verdict.",
+        })
+    return findings
+
+
+def _governable_toplevel_files(target: pathlib.Path) -> list[str]:
+    """Relative paths of existing files that match the governable-toplevel pattern."""
+    out = []
+    for path in target.rglob("*"):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(target).as_posix()
+        if rel.count("/") > 1:
+            continue  # top level or one dir deep (scripts/install.sh) only
+        if GOVERNABLE_TOPLEVEL.match(rel):
+            out.append(rel)
+    return out
+
+
 SEV_ICON = {"high": "🔴", "medium": "🟡", "low": "🟢"}
 
 
@@ -591,6 +658,7 @@ def main() -> int:
         + check_duplicates(target, files)
         + check_stale(target, files)
         + check_spec_drift_candidates(target)
+        + check_coverage_gaps(target)
         + check_dead_skill_refs(target, agent_files)
         + check_agent_instruction_clusters(target, agent_files)
         + check_memory_leak(target, agent_files)

@@ -733,6 +733,25 @@
         "Mentions SOURCES.md / scope as defining what the project actually owns",
         "Marks the project SOURCES.md entries NOT_CHECKED and requires confirmation before any sweep — never auto-edits files inside dependency caches"
       ]
+    },
+    {
+      "id": 41,
+      "name": "coverage-gap-undeclared-doc",
+      "prompt": "Run context-gc. The repo has an INSTALL_AGENT.md (a top-level install doc) that is NOT declared in any SOURCES.md domain — it is neither a root nor a copy anywhere. The other install docs ARE declared. Decide what context-gc should surface about INSTALL_AGENT.md.",
+      "files": {
+        "SOURCES.md": "### `install-flow`\n\n- **Root:** `scripts/init_context_gc.py`\n- **Copies:**\n  - `INSTALL.md` — full install guide\n- **Status:** `SYNCED`\n",
+        "INSTALL.md": "Run init to install.\n",
+        "INSTALL_AGENT.md": "Paste this to your agent to install.\n",
+        "scripts/init_context_gc.py": "# bootstrap\n"
+      },
+      "expected_output": "context-gc raises a coverage-gap / NEEDS_JUDGMENT for INSTALL_AGENT.md: it is a top-level onboarding doc that is outside the governance map (not declared as a root or copy in any SOURCES.md domain). This is meta-drift — the authority map itself is incomplete. The fix is a prompt, not a verdict: should INSTALL_AGENT.md be governed (declare it as a copy of init_context_gc.py, alongside INSTALL.md), or does it genuinely need no governance? It does not auto-edit SOURCES.md; it surfaces the gap for the maintainer to decide.",
+      "assertions": [
+        "Flags INSTALL_AGENT.md as a coverage-gap — a governable doc not declared in any SOURCES domain",
+        "Frames it as the authority map (SOURCES.md) being incomplete, i.e. meta-drift",
+        "Proposes declaring it as a copy of the right root (init_context_gc.py) rather than auto-deciding",
+        "Does not auto-edit SOURCES.md; surfaces the gap for human judgment",
+        "Requires confirmation before changing SOURCES.md; treats the authority map as human-owned"
+      ]
     }
   ]
 }
