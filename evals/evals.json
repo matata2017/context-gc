@@ -1037,6 +1037,20 @@
         "Medium severity because wrong counts mislead users about coverage",
         "Does not flag when the doc count matches reality"
       ]
+    },
+    {
+      "id": 59,
+      "name": "fp-suppression-translation-dirs-monorepo-templates-example-paths",
+      "prompt": "context-gc runs mark on three real open-source projects. (1) FastAPI has docs/de/docs/ with German translations that use ../release-notes.md relative links — the file exists in docs/en/ but not relative to the German directory. (2) LangChain has 21 libs/partners/*/README.md files that each contain the same badge line \"[![Twitter](https://img.shields.io/twitter/...)\". (3) claude-code docs teach \"my-plugin/hooks/hooks.json\" as an example path. How does context-gc handle each to avoid false positives?",
+      "files": {},
+      "expected_output": "Three FP suppression heuristics, each learned from real-project testing: (1) Translation directories (docs/{de,es,fr,ja,...}/) are skipped by check_orphans because relative links there point to the source language files and produce systematic false positives — FastAPI had 51 such FP that dropped to 21 after suppression. (2) Monorepo template boilerplate lines (badges, shields, org links, \"Code of Conduct\", \"Looking for the JS version?\") are skipped by check_duplicates because they are intentional template inheritance across sub-package READMEs, not drift — LangChain had 9 duplicate findings that dropped to 5. (3) Example/placeholder paths (my-plugin/*, path/to/*) in command references are filtered by CMD_PLACEHOLDER_RE so that tutorial docs teaching template paths are not flagged as dead commands — claude-code dropped from 6 to 4 orphan-command-refs. Each heuristic is narrow and evidence-based: it targets a specific FP pattern observed on a real project, not a broad suppression. No edits happen without explicit user confirmation (the sweep gate). SOURCES.md write barrier is preserved.",
+      "assertions": [
+        "Translation subdirectories (docs/{de,es,fr,ja,ko}/) are skipped by orphan-reference checks to avoid relative-link false positives",
+        "Monorepo template lines (badges, shields, org links) are skipped by duplicate-block checks as intentional template inheritance",
+        "Example/placeholder paths (my-plugin/*, path/to/*) in command references are filtered as tutorial examples, not dead commands",
+        "Each suppression is narrow and evidence-based from a specific real-project FP pattern",
+        "The remaining findings after suppression are genuine drift candidates, not noise"
+      ]
     }
   ]
 }

@@ -402,10 +402,26 @@ def context_budget_findings(target: pathlib.Path, files: list[pathlib.Path]) -> 
     return findings, lines
 
 
+def _is_translation_subdir(rel: str) -> bool:
+    """Heuristic: path like docs/{de,es,fr,ja,ko,pt,zh}/... indicates a translation directory
+    where relative links (../release-notes.md) may not resolve locally but point to the source
+    language's files. These are false positives for orphan-reference checks."""
+    parts = rel.split("/")
+    if len(parts) >= 3 and parts[0] in {"docs", "documentation", "doc"}:
+        # Common 2-letter locale codes used in translation directories
+        if parts[1] in {"de", "es", "fr", "ja", "ko", "pt", "zh", "hi", "ru", "it", "ar", "nl", "tr", "uk", "pl", "cs", "th", "id", "bn", "vi", "sv", "da", "fi", "no", "el", "he", "ro", "hu", "ca"}:
+            return True
+    return False
+
+
 def check_orphans(target: pathlib.Path, files: list[pathlib.Path]) -> list[dict]:
     findings = []
     for path in files:
         rel = path.relative_to(target).as_posix()
+        # Skip translation subdirectories — relative links there point to the source language's
+        # files and produce systematic false positives (e.g. FastAPI's 51/80 findings).
+        if _is_translation_subdir(rel):
+            continue
         try:
             text = path.read_text(encoding="utf-8")
         except Exception:
@@ -443,7 +459,7 @@ def check_orphans(target: pathlib.Path, files: list[pathlib.Path]) -> list[dict]
 CMD_REF_RE = re.compile(
     r"\b(?:python3?|node|bash|sh|ruby|deno|ts-node|go run|pytest|php|perl)\s+([A-Za-z0-9_][\w\-./]*\.[A-Za-z0-9]+)"
 )
-CMD_PLACEHOLDER_RE = re.compile(r"path/to|your[-_]|/example|<[^>]+>|\.\.\.|YOUR|\$\{", re.I)
+CMD_PLACEHOLDER_RE = re.compile(r"path/to|your[-_]|/example|<[^>]+>|\.\.\.|YOUR|\$\{|my-plugin", re.I)
 
 
 def check_orphan_command_refs(target: pathlib.Path, files: list[pathlib.Path]) -> list[dict]:
@@ -491,6 +507,19 @@ def check_orphan_command_refs(target: pathlib.Path, files: list[pathlib.Path]) -
     return findings
 
 
+def _is_monorepo_template_line(line: str) -> bool:
+    """Heuristic: lines that are monorepo template boilerplate — badges, shields, links to
+    org resources — repeated across sub-package READMEs. These are intentional template
+    inheritance, not drift. Found in LangChain (21 sub-package READMEs with identical badges)."""
+    low = line.lower()
+    return bool(
+        "shields.io" in low
+        or "[![" in low and ("badge" in low or "twitter" in low or "github" in low or "pypi" in low or "npm" in low)
+        or low.startswith("- [") and ("code of conduct" in low or "contributing" in low or "license" in low or "academy" in low)
+        or low.startswith("looking for the") and "version" in low
+    )
+
+
 def check_duplicates(target: pathlib.Path, files: list[pathlib.Path]) -> list[dict]:
     seen: dict[str, list[str]] = {}
     for path in files:
@@ -502,6 +531,8 @@ def check_duplicates(target: pathlib.Path, files: list[pathlib.Path]) -> list[di
         for raw in text.splitlines():
             line = raw.strip()
             if len(line) < 40 or TRIVIAL.match(line):
+                continue
+            if _is_monorepo_template_line(line):
                 continue
             seen.setdefault(line, [])
             if rel not in seen[line]:
