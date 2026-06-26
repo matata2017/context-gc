@@ -119,7 +119,7 @@ def _policy_class(kind: str, evidence: list[str]) -> str:
     for path in evidence:
         p = path.replace("\\", "/").lower()
         name = p.rsplit("/", 1)[-1]
-        if name in {"claude.md", "soul.md"} or "/memory/" in f"/{p}" or "/skills/" in f"/{p}" or "/adr/" in f"/{p}" or "/sdd" in p:
+        if name in {"claude.md", "soul.md", "agents.md", "sources.md"} or "/memory/" in f"/{p}" or "/skills/" in f"/{p}" or "/adr/" in f"/{p}" or "/sdd" in p:
             return "protected"
     if kind in _SENSITIVE_KINDS:
         return "sensitive"
@@ -203,6 +203,45 @@ def build_queue(target: pathlib.Path) -> list[dict[str, Any]]:
     for e in _load(state / "memory-gc.json").get("entries", []):
         if e.get("status") == "CONFLICT_NEEDS_REVIEW":
             add("memory-conflict", f"{e.get('domain', 'memory')}: {e.get('detail', '')}", e.get("sources", []), e.get("detail", ""))
+
+    # Mark → Sweep bridge: when several dead references pile up in ONE file, the whole file may be a
+    # refactor leftover — but whether it IS garbage is a judgment (a doc can have valid content plus a
+    # few stale lines). So we don't auto-collect; we raise ONE decision per such file offering `collect`
+    # (move to the recycle bin, reversible) vs fix-in-place, and leave the call to the human (recommend
+    # -1). Protected agent roots (CLAUDE.md/AGENTS.md/SOURCES.md/memory/skills) never get a collect
+    # option — they are roots, not leftovers; fix their lines instead.
+    orphan_count: dict[str, int] = {}
+    for f in findings:
+        if f.get("type") in {"orphan-reference", "orphan-command-ref"}:
+            for loc in _evidence(f):
+                fp = loc.split(":", 1)[0]
+                orphan_count[fp] = orphan_count.get(fp, 0) + 1
+    for fp, count in sorted(orphan_count.items()):
+        if count < 3:
+            continue
+        item_id = _id("stale-file-candidate", [fp])
+        if item_id in items:
+            continue
+        protected = _policy_class("", [fp]) == "protected"
+        options: list[dict[str, Any]] = []
+        if not protected:
+            options.append({"label": f"Collect `{fp}` to the recycle bin (reversible)",
+                            "action": {"op": "collect", "path": fp, "reason": f"{count} dead references — suspected refactor leftover"}})
+        options.append({"label": "Keep the file; fix the dead references in place", "action": {"op": "manual"}})
+        why = (f"`{fp}` has {count} references pointing at things that no longer exist. The whole file may "
+               "be a leftover from a refactor — or still useful with a few stale lines. You decide.")
+        if protected:
+            why += " It is a protected agent root, so fix the lines in place rather than collecting it."
+        else:
+            why += " Sweep it to the recycle bin (one-command undo), or fix the lines in place."
+        items[item_id] = {
+            "id": item_id, "kind": "stale-file-candidate",
+            "summary": f"`{fp}` has {count} dead references — whole file a refactor leftover?",
+            "detail": f"{count} references in {fp} point at files/scripts that no longer exist",
+            "evidence": [fp], "evidence_preview": [_snippet(target, fp)], "why": why,
+            "options": options, "recommend": -1,
+            "policy_class": "protected" if protected else "review", "status": "open",
+        }
 
     return list(items.values())
 

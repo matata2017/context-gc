@@ -158,6 +158,11 @@ waiting":
    - `consolidate_anchor` → keep the policy in the chosen root, replace the other copies with pointers.
    - `mark_fork` / `mark_historical` → set that domain's `SOURCES.md` status; stop re-flagging it.
    - `reconcile_to_root` / `flag_implementation_gap` → apply the SDD-drift treatment from the playbook.
+   - `collect` → the user judged the whole file a refactor leftover: run
+     `python scripts/collect.py --target . --collect <action.path> --reason "<why>"` to move it to the
+     recycle bin (reversible — `collect.py --restore <id>` brings it back; `--list` shows the bin).
+     This is the Mark→Sweep bridge: the detector surfaced the dead references, the user made the
+     judgment, collect carries it out safely. Protected roots are never offered this option.
    - `manual` / `defer` → let the user edit, or leave the item for later.
 4. Update `SOURCES.md` for the resolved domain and remove the item from the queue.
 5. Batch-friendly: 3 waiting decisions = 3 quick questions, then done. All existing safety rules still
