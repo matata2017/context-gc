@@ -141,10 +141,13 @@ waiting":
 
 1. Run `python scripts/review_queue.py --target .` to aggregate open `NEEDS_REVIEW` /
    `CONFLICT_NEEDS_REVIEW` / `UNKNOWN_ROOT` decisions into `.context-gc/review-queue.json`.
-2. For each `"status": "open"` item, ask **one AskUserQuestion** built from the item: use `summary`
-   as the question, `evidence` for context, and the item's `options` as the choices (put the
-   `recommend` index first if it is ≥ 0; if `recommend` is -1 the conflict is genuinely ambiguous —
-   present options neutrally).
+2. For each `"status": "open"` item, ask **one AskUserQuestion** built from the item, as a decision
+   card the user can answer without opening a single file: lead the question with the item's `why`
+   (why *they* are being asked and why it was not auto-resolved), use `summary` for what drifted, put
+   each `evidence_preview` line (path + the actual text) in the question context so both sides are
+   visible inline, and offer the `options` as choices. Put the `recommend` index first if it is ≥ 0;
+   if `recommend` is -1 the conflict is genuinely ambiguous — present options neutrally and do not
+   imply a default. The goal: 3 waiting decisions = 3 quick, self-contained questions, no file-spelunking.
 3. On the user's answer, perform the option's declarative `action`:
    - `set_current_memory` → write the chosen source as the current memory (keep originals as evidence).
    - `consolidate_anchor` → keep the policy in the chosen root, replace the other copies with pointers.

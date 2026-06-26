@@ -895,6 +895,22 @@
         "Says judgment-level contradictions surface only as each domain's root is confirmed/approved by the user",
         "Records confirmed roots in SOURCES.md as the write barrier and clears debt in batches; no rewrite without confirmation"
       ]
+    },
+    {
+      "id": 50,
+      "name": "review-decision-card-no-file-spelunking",
+      "prompt": "context-gc has 2 drift decisions waiting and the user is present to review them. Each review-queue item carries: why (why this is reserved for the human), summary (what drifted), evidence_preview (each path PLUS the actual text on that line), options, recommend = -1, policy_class = protected. One is an agent-instruction cluster across CLAUDE.md and SOUL.md. How do you present each decision to the user for a good human-in-the-loop experience?",
+      "files": {
+        ".context-gc/review-queue.json": "{\"open\":2,\"items\":[{\"id\":\"semantic-instruction-cluster-1a\",\"kind\":\"semantic-instruction-cluster\",\"policy_class\":\"protected\",\"recommend\":-1,\"why\":\"Touches a protected root (agent instructions / memory / SDD). context-gc never auto-edits these - the decision is yours, so it waited for you.\",\"summary\":\"overlapping scraping policy across agent roots\",\"evidence_preview\":[\"CLAUDE.md:2  \\\"Limit scraping to 10 req/s\\\"\",\"SOUL.md:1  \\\"Limit scraping to 10 req/s\\\"\"],\"options\":[{\"label\":\"Anchor policy on CLAUDE.md\"},{\"label\":\"Anchor policy on SOUL.md\"},{\"label\":\"Keep both as scoped FORK\"}]}]}\n"
+      },
+      "expected_output": "The agent presents each item as a self-contained decision card the user can answer without opening any file: it leads with the item's why (why THIS decision is reserved for the human and was not auto-resolved — here, it touches protected agent roots), states what drifted from summary, and inlines each evidence_preview line (path + the actual text) so both sides are visible in the question itself. It asks one AskUserQuestion per item and uses the provided options as the choices. Because recommend == -1, it presents the options neutrally and does not imply a default or pick for the user. It does not dump raw JSON, does not tell the user to go read the files, and does not self-resolve the protected item — the decision is applied only after the user's confirmation/approval, and the chosen root is recorded in SOURCES.md. Two waiting decisions become two quick, self-contained questions.",
+      "assertions": [
+        "Leads each decision with why it needs the human (especially why a protected item was not auto-resolved)",
+        "Inlines the evidence_preview actual text so the user decides without opening any file",
+        "Presents recommend == -1 options neutrally, implying no default and not picking for the user",
+        "Asks one AskUserQuestion per item (batch-friendly) rather than dumping JSON or a wall of text",
+        "Does not self-resolve the protected item; applies the choice only on the user's confirmation/approval and records the root in SOURCES.md"
+      ]
     }
   ]
 }

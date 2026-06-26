@@ -128,7 +128,41 @@ def _policy_class(kind: str, evidence: list[str]) -> str:
     return "review"
 
 
-def build_queue(state: pathlib.Path) -> list[dict[str, Any]]:
+def _why(kind: str, policy_class: str, recommend: int, evidence: list[str]) -> str:
+    """One human-facing line: why this decision is in front of YOU and was not auto-resolved.
+
+    Good human-in-the-loop UX starts with 'why am I being asked'. Without it an escalated item looks
+    like an unattended chore an eager agent will 'just finish' — the exact failure a driving agent hit.
+    """
+    n = len(evidence)
+    if policy_class == "protected":
+        return ("Touches a protected root (agent instructions / memory / SDD). context-gc never "
+                "auto-edits these — the decision is yours, so it waited for you.")
+    if policy_class == "sensitive":
+        return ("Agent memory/instruction drift — auto-merging could poison future context, so it is "
+                "reserved for your call.")
+    if recommend == -1:
+        return (f"The {n} sources genuinely conflict and none is provably the root. context-gc won't "
+                "guess truth: pick the current one, or scope them as an intentional FORK.")
+    return "A quick call — resolve now or defer. Low risk, but context-gc leaves truth to you."
+
+
+def _snippet(target: pathlib.Path, ev: str) -> str:
+    """A short content preview for an evidence path so the reviewer need not open the file."""
+    path, _, line = ev.partition(":")
+    try:
+        lines = (target / path).read_text(encoding="utf-8").splitlines()
+    except Exception:
+        return ev
+    if line.isdigit() and 1 <= int(line) <= len(lines):
+        text = lines[int(line) - 1].strip()
+    else:
+        text = next((ln.strip() for ln in lines if ln.strip() and not ln.strip().startswith("#")), "")
+    return f'{ev}  "{text[:80]}"' if text else ev
+
+
+def build_queue(target: pathlib.Path) -> list[dict[str, Any]]:
+    state = target / ".context-gc"
     items: dict[str, dict[str, Any]] = {}
 
     def add(kind: str, summary: str, evidence: list[str], detail: str) -> None:
@@ -138,15 +172,18 @@ def build_queue(state: pathlib.Path) -> list[dict[str, Any]]:
         if item_id in items:
             return
         options, recommend = _options_for(kind, evidence)
+        policy_class = _policy_class(kind, evidence)
         items[item_id] = {
             "id": item_id,
             "kind": kind,
             "summary": summary,
             "detail": detail,
             "evidence": evidence,
+            "evidence_preview": [_snippet(target, e) for e in evidence],
+            "why": _why(kind, policy_class, recommend, evidence),
             "options": options,
             "recommend": recommend,
-            "policy_class": _policy_class(kind, evidence),
+            "policy_class": policy_class,
             "status": "open",
         }
 
@@ -182,7 +219,7 @@ def main() -> int:
         return 1
     state = target / ".context-gc"
     state.mkdir(exist_ok=True)
-    queue = build_queue(state)
+    queue = build_queue(target)
     out = state / "review-queue.json"
     out.write_text(
         json.dumps(
