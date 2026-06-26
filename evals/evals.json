@@ -911,6 +911,23 @@
         "Asks one AskUserQuestion per item (batch-friendly) rather than dumping JSON or a wall of text",
         "Does not self-resolve the protected item; applies the choice only on the user's confirmation/approval and records the root in SOURCES.md"
       ]
+    },
+    {
+      "id": 51,
+      "name": "scope-check-before-resolve-cross-branch",
+      "prompt": "You are running the context-gc review flow. .context-gc/review-queue.json carries scope {\"branch\": \"feature-auth\", \"head_sha\": \"ab12\"} and has 2 open decisions. But the working tree's current branch (git rev-parse --abbrev-ref HEAD) is \"main\". What do you do with the 2 decisions?",
+      "files": {
+        ".context-gc/review-queue.json": "{\"target\":\"app\",\"scope\":{\"branch\":\"feature-auth\",\"head_sha\":\"ab12\"},\"open\":2,\"items\":[{\"id\":\"x1\",\"kind\":\"contradiction\",\"summary\":\"port 8000 vs 8080\",\"status\":\"open\"},{\"id\":\"x2\",\"kind\":\"spec-drift\",\"summary\":\"auth doc vs code\",\"status\":\"open\"}]}\n",
+        "SOURCES.md": "### `app`\n\n- **Root:** `app.py`\n- **Status:** `SYNCED`\n"
+      },
+      "expected_output": "The agent checks the queue's scope against the current git branch FIRST. The queue's scope.branch is feature-auth but the working tree is on main — the findings were taken on a different branch, so git has since swapped the working tree out from under them. It must NOT resolve these decisions on main: applying a fix here would land it against the wrong working tree (the files the decisions reference are the feature-auth versions, not what is checked out). The correct move is to regenerate the queue for the current branch — re-run a tick / mark on main — and only then review. If after refreshing there are decisions for the current branch, each is still applied only on the user's confirmation/approval and recorded in SOURCES.md. The scope stamp exists precisely so cross-branch state is caught before a wrong-tree edit.",
+      "assertions": [
+        "Compares the queue's scope.branch against the current git branch before acting",
+        "Detects the mismatch: the decisions belong to a different branch whose files are no longer checked out",
+        "Refuses to resolve the cross-branch decisions on the current branch (would edit the wrong working tree)",
+        "Regenerates the queue for the current branch (re-run tick/mark) before reviewing",
+        "Any eventual resolution still requires the user's confirmation/approval and is recorded in SOURCES.md"
+      ]
     }
   ]
 }

@@ -31,6 +31,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from _common import (  # noqa: E402
     DEFAULT_EXCLUDES,
     _excluded,
+    current_scope,
     git_last_commit_epoch,
     iter_agent_context_files,
     iter_context_files,
@@ -920,6 +921,7 @@ def main() -> int:
         "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "dirty_only": a.dirty_only,
         "files_scanned": len(files),
+        "scope": current_scope(target),
         "findings": findings,
     }, ensure_ascii=False, indent=2), encoding="utf-8")
 

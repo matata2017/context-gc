@@ -220,10 +220,11 @@ def main() -> int:
     state = target / ".context-gc"
     state.mkdir(exist_ok=True)
     queue = build_queue(target)
+    scope = _load(state / "findings.json").get("scope")  # inherit the git scope of the findings we aggregated
     out = state / "review-queue.json"
     out.write_text(
         json.dumps(
-            {"target": target.name, "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"), "open": len(queue), "items": queue},
+            {"target": target.name, "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"), "scope": scope, "open": len(queue), "items": queue},
             ensure_ascii=False,
             indent=2,
         ),

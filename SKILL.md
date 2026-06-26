@@ -141,6 +141,11 @@ waiting":
 
 1. Run `python scripts/review_queue.py --target .` to aggregate open `NEEDS_REVIEW` /
    `CONFLICT_NEEDS_REVIEW` / `UNKNOWN_ROOT` decisions into `.context-gc/review-queue.json`.
+   **Scope check first:** the queue carries a `scope` (the git branch + HEAD its findings were taken
+   under). If that branch differs from the working tree's current branch, these decisions belong to a
+   *different* branch — the files have since been swapped out. Do not resolve them here; re-run a tick
+   to regenerate the queue for the current branch first. Resolving cross-branch is how a fix lands
+   against the wrong working tree.
 2. For each `"status": "open"` item, ask **one AskUserQuestion** built from the item, as a decision
    card the user can answer without opening a single file: lead the question with the item's `why`
    (why *they* are being asked and why it was not auto-resolved), use `summary` for what drifted, put
