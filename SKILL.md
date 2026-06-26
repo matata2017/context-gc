@@ -85,9 +85,26 @@ memory-condense, and genuinely ambiguous items (`recommend == -1`) always escala
 
 Loop / agent orchestrator should:
 1. Run `gc_tick` after meaningful work or on a schedule.
-2. If `escalated > 0` or `steps_rc` non-zero: inspect `review-queue.json` and decide whether to spawn
-   worker agents (for sensitive/ambiguous items) or pause for human input.
+2. If `escalated > 0` or `steps_rc` non-zero: inspect `review-queue.json`. An escalated item is one
+   policy reserves for a human (protected root, `unknown-root`, delete, memory). Your **only** legal
+   moves on it are: leave it queued, report it to a human, or spawn a higher-authority worker if your
+   framework has one. Do **not** resolve it yourself, and do **not** reach past the tool to hand-edit
+   `SOURCES.md`.
 3. If `pending == 0`: continue; no human interruption needed.
+4. After a tick, write the durable outcome back into your own long-term memory (whatever your framework
+   uses): which domains you auto-resolved, which you escalated, the current `SOURCES.md` status.
+   `gc_tick`'s JSON and `.context-gc/decisions.jsonl` are that hand-off surface — context-gc records the
+   audit trail but cannot reach into your memory. A later session only knows this skill was already
+   calibrated if you wrote that there; otherwise it re-derives stale state from the day it was installed.
+
+> **Escalation is a HOLD, not a cue to freestyle.** A capable agent's instinct is to "finish" an open
+> item by picking an option — that instinct is wrong here. Items are escalated *because* the root is
+> protected or genuinely ambiguous, so you do not have the authority to pick. Above all, never use
+> **`mark_fork` / `mark_historical` as a default to clear the queue** — both set a `SOURCES.md` status
+> that *stops the item from ever being re-flagged*. Marking a real contradiction (e.g. two different
+> rate limits) as FORK does not resolve it, it **silences** it. `mark_fork` is correct only once the
+> divergence is *confirmed* intentional. When unsure: HOLD. A pending item waiting for a human is the
+> right outcome, not a failure to act.
 
 ### Human fallback — `setup` and `review`
 
