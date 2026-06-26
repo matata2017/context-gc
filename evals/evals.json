@@ -1009,6 +1009,34 @@
         "the first tick after init produces real escalated/pending items, not all zeros",
         "findings from a previous full mark are not lost when a subsequent dirty-only tick has nothing incremental to scan"
       ]
+    },
+    {
+      "id": 57,
+      "name": "code-doc-drift-detects-undocumented-flags-and-phantom-flags",
+      "prompt": "context-gc runs mark on a project. Script scripts/collect.py has flags --collect, --restore, --list, and --target. The README mentions \"collect.py --target\" but never mentions --restore or --list. Meanwhile, docs/workflow.md says \"gc_tick --gate\" but gc_tick.py has no --gate flag. What should the code-doc-drift detector find?",
+      "files": {},
+      "expected_output": "The detector should find two types of drift: (1) scripts/collect.py has undocumented CLI flags (--restore, --list) that no doc mentions — low severity because the script exists and works, but users may not discover these features. (2) docs/workflow.md references gc_tick --gate but gc_tick.py does not have that flag — medium severity because the doc teaches a command that will fail. The detector extracts flags from argparse add_argument calls in scripts/*.py, then cross-checks against flag patterns found in markdown docs. Undocumented flags are low severity (the script works, just not fully documented); phantom flags in docs are medium severity (the doc teaches something that does not exist). No edits happen without explicit user confirmation (the sweep gate). SOURCES.md write barrier is preserved.",
+      "assertions": [
+        "Detects CLI flags in scripts that no doc mentions (undocumented interface)",
+        "Detects doc references to script flags that do not exist in the script (phantom interface)",
+        "Undocumented flags are low severity (script works, just not discoverable)",
+        "Phantom flags in docs are medium severity (doc teaches a command that fails)",
+        "Extraction uses argparse add_argument patterns, not manual flag lists"
+      ]
+    },
+    {
+      "id": 58,
+      "name": "stale-count-detects-hardcoded-numbers-that-diverged-from-reality",
+      "prompt": "A project has 56 eval scenarios in evals/evals.json, 10 demo directories under examples/, and 11 runner scripts under scripts/. The README says \"35 eval scenarios\" and \"9 demos\". The architecture.md says \"28 eval\". What should the stale-count detector find?",
+      "files": {},
+      "expected_output": "The stale-count detector should flag: (1) README says 35 evals but evals/evals.json actually has 56 (medium severity — the count is wrong, users get wrong expectations). (2) README says 9 demos but examples/ actually has 10 (medium). (3) architecture.md says 28 evals but the real count is 56 (medium). The detector works by: counting actual items (evals in JSON, demo directories, runner scripts), then scanning markdown docs for patterns like \"N eval\" / \"N demo\" / \"N script\" and flagging where the stated number differs from the real count. This catches the specific drift mode where code grows but doc sentences are written once and forgotten. No edits happen without explicit user confirmation (the sweep gate). SOURCES.md write barrier is preserved.",
+      "assertions": [
+        "Counts actual items (evals, demos, scripts) from the filesystem/JSON",
+        "Scans docs for hardcoded count patterns (\"N eval\", \"N demo\", \"N script\")",
+        "Flags when a doc states a different number than the actual count",
+        "Medium severity because wrong counts mislead users about coverage",
+        "Does not flag when the doc count matches reality"
+      ]
     }
   ]
 }

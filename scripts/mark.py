@@ -895,6 +895,182 @@ def check_external_root_drift(target: pathlib.Path) -> list[dict]:
     return findings
 
 
+def check_code_doc_drift(target: pathlib.Path) -> list[dict]:
+    """Code→Doc drift — scripts have CLI flags/subcommands that docs don't mention, or docs
+    reference flags that no longer exist.
+
+    The orphan-command-ref check catches "doc references a dead script PATH". This catches a
+    different failure mode: the script exists but its CLI interface diverged from what docs describe.
+    Found when context-gc's own docs claimed `gc_tick --gate` which didn't exist, while `collect.py`
+    (a whole new runner) was never added to the architecture file.
+
+    Strategy: for each scripts/*.py with argparse, extract its flags. Then check if any doc
+    files reference those flags. Flag it when a script has flags unmentioned in any doc, or a doc
+    mentions a flag (--foo) the script doesn't accept.
+    """
+    import re as _re
+
+    scripts_dir = target / "scripts"
+    if not scripts_dir.is_dir():
+        return []
+
+    findings: list[dict] = []
+
+    # 1) Extract CLI flags from each script's argparse.
+    flag_pattern = _re.compile(r'add_argument\(\s*["\'](-{1,2}[\w-]+)')
+    script_flags: dict[str, set[str]] = {}
+    for sp in sorted(scripts_dir.glob("*.py")):
+        if sp.name.startswith("_"):
+            continue
+        try:
+            text = sp.read_text(encoding="utf-8")
+        except Exception:
+            continue
+        flags = set(flag_pattern.findall(text))
+        if flags:
+            script_flags[sp.name] = flags
+
+    # 2) Scan doc files for flag references (--something).
+    doc_flag_pattern = _re.compile(r"(?<!\w)(-{1,2}[\w-]{2,})")
+    doc_flags_by_file: dict[str, set[str]] = {}
+    doc_files: list[pathlib.Path] = []
+    for pat in ("*.md",):
+        for dp in sorted(target.rglob(pat)):
+            rel = dp.relative_to(target).as_posix()
+            # Skip .context-gc/ internals
+            if rel.startswith(".context-gc/"):
+                continue
+            try:
+                text = dp.read_text(encoding="utf-8")
+            except Exception:
+                continue
+            doc_files.append(dp)
+            # Collect flags mentioned in this doc that look like CLI flags
+            mentioned = set()
+            for m in doc_flag_pattern.finditer(text):
+                flag = m.group(1)
+                # Filter out common non-CLI patterns (markdown --, emoji, etc.)
+                if flag.startswith("---") or len(flag) < 3:
+                    continue
+                mentioned.add(flag)
+            if mentioned:
+                doc_flags_by_file[rel] = mentioned
+
+    # 3) Cross-check: flags in script but not in any doc.
+    all_doc_flags: set[str] = set()
+    for flags in doc_flags_by_file.values():
+        all_doc_flags.update(flags)
+    for script_name, flags in sorted(script_flags.items()):
+        undocumented = flags - all_doc_flags
+        # Only flag non-trivial flags (skip common ones like --help, --target, --json-only)
+        skip = {"--help", "-h", "--target", "--json-only", "--quiet", "--version"}
+        undocumented -= skip
+        if undocumented and len(undocumented) >= 2:
+            findings.append({
+                "type": "code-doc-drift",
+                "status": "DRIFTED",
+                "severity": "low",
+                "file": f"scripts/{script_name}",
+                "detail": f"scripts/{script_name} has CLI flags not mentioned in any doc: {', '.join(sorted(undocumented))}",
+                "needs_judgment": "Are these flags intentionally undocumented, or did the docs miss them? If the latter, update the relevant doc file(s) to cover the new interface.",
+            })
+
+    # 4) Cross-check: flags in doc referencing a specific script but the script doesn't have them.
+    #    Look for patterns like "script_name --flag" in docs.
+    script_ref_pattern = _re.compile(r'(\w+\.py)\s+((?:-{1,2}[\w-]+\s*)+)')
+    for dp in doc_files:
+        try:
+            text = dp.read_text(encoding="utf-8")
+        except Exception:
+            continue
+        rel = dp.relative_to(target).as_posix()
+        for m in script_ref_pattern.finditer(text):
+            script_name = m.group(1)
+            flag_str = m.group(2)
+            if script_name not in script_flags:
+                continue  # script not in our project — skip
+            mentioned = set(doc_flag_pattern.findall(flag_str))
+            nonexistent = mentioned - script_flags[script_name] - skip
+            if nonexistent:
+                findings.append({
+                    "type": "code-doc-drift",
+                    "status": "DRIFTED",
+                    "severity": "medium",
+                    "file": rel,
+                    "detail": f"doc references `{script_name} {' '.join(sorted(nonexistent))}` but the script does not have that flag",
+                    "needs_judgment": f"The doc says the script accepts {', '.join(sorted(nonexistent))} but it doesn't. Update the doc, or check if a refactor removed the flag.",
+                })
+
+    return findings
+
+
+_COUNT_PATTERN = __import__("re").compile(r'\b(\d+)\s+(?:个|eval|demo|runner|script|test|file|check)\b', __import__("re").IGNORECASE)
+
+
+def check_stale_counts(target: pathlib.Path) -> list[dict]:
+    """Stale hardcoded counts — docs state "N evals" / "N demos" but the actual count differs.
+
+    When a project adds evals, demos, or scripts, the count in README/architecture/INSTALL often
+    lags behind. This is a concrete, mechanical check: count the real items, find doc sentences
+    that state a different number. Found when context-gc's own docs said "28 eval" for months
+    after the real count had grown to 56.
+    """
+    import re as _re
+
+    findings: list[dict] = []
+    # Define what to count and where to look for it.
+    count_targets = [
+        {
+            "name": "evals",
+            "count_fn": lambda t: len(__import__("json").loads((t / "evals" / "evals.json").read_text(encoding="utf-8")).get("evals", [])),
+            "patterns": [_re.compile(r'(\d+)\s+(?:个\s*)?eval', _re.IGNORECASE)],
+            "path": "evals/evals.json",
+        },
+        {
+            "name": "demos",
+            "count_fn": lambda t: len(list((t / "examples").glob("demo-*"))),
+            "patterns": [_re.compile(r'(\d+)\s+(?:个\s*)?demo', _re.IGNORECASE)],
+            "path": "examples/",
+        },
+        {
+            "name": "runner scripts",
+            "count_fn": lambda t: len([p for p in (t / "scripts").glob("*.py") if not p.name.startswith("_") and p.name not in {"run_evals.py", "validate_context_gc.py"}]),
+            "patterns": [_re.compile(r'(\d+)\s+(?:个\s*)?(?:runner|script)', _re.IGNORECASE)],
+            "path": "scripts/",
+        },
+    ]
+
+    for ct in count_targets:
+        try:
+            actual = ct["count_fn"](target)
+        except Exception:
+            continue
+        if actual == 0:
+            continue
+        # Scan doc files for the count pattern
+        for dp in sorted(target.rglob("*.md")):
+            rel = dp.relative_to(target).as_posix()
+            if rel.startswith(".context-gc/") or rel.startswith("examples/"):
+                continue
+            try:
+                text = dp.read_text(encoding="utf-8")
+            except Exception:
+                continue
+            for pat in ct["patterns"]:
+                for m in pat.finditer(text):
+                    stated = int(m.group(1))
+                    if stated != actual:
+                        findings.append({
+                            "type": "stale-count",
+                            "status": "DRIFTED",
+                            "severity": "medium",
+                            "file": rel,
+                            "detail": f"doc says {stated} {ct['name']} but {ct['path']} actually has {actual}",
+                            "needs_judgment": f"Update the count from {stated} to {actual} in {rel}, or verify the counting method is correct.",
+                        })
+    return findings
+
+
 SEV_ICON = {"high": "🔴", "medium": "🟡", "low": "🟢"}
 
 
@@ -962,6 +1138,8 @@ def main() -> int:
         + check_env_matrix_drift(target)
         + check_structural_drift(target)
         + check_external_root_drift(target)
+        + check_code_doc_drift(target)
+        + check_stale_counts(target)
         + check_dead_skill_refs(target, agent_files)
         + check_agent_instruction_clusters(target, agent_files)
         + check_memory_leak(target, agent_files)

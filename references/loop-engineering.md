@@ -231,7 +231,7 @@ patterns.jsonl           decisions.jsonl         findings.json
 
 | 可复刻的东西 | 不可复刻的东西 |
 |---|---|
-| 2000 行 Python 脚本 | 28 个 eval 覆盖的漂移分类知识 |
+| 2000 行 Python 脚本 | 56 个 eval 覆盖的漂移分类知识 |
 | mark.py 的检测函数 | 每个真实项目积累的 patterns.jsonl |
 | SOURCES.md 格式 | 团队在所有仓库建立的一致性契约网络 |
 | 安装命令 | 部署后运行一个月积累的 decisions.jsonl 审计链 |
