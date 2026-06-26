@@ -462,6 +462,12 @@ def check_orphan_command_refs(target: pathlib.Path, files: list[pathlib.Path]) -
         if path.suffix.lower() not in {".md", ".mdx"}:
             continue
         rel = _rel(target, path)
+        # SOURCES.md contains re-check commands (e.g. `python scripts/mark.py`) that are
+        # governance directives, not project toolchain references.  Skipping it avoids a
+        # false positive every time init_context_gc writes a re-check for a context-gc script
+        # that does not live in the target project.
+        if rel.lower() == "sources.md":
+            continue
         text = _read_text(path)
         for m in CMD_REF_RE.finditer(text):
             ref = m.group(1)

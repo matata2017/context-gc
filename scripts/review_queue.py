@@ -211,11 +211,16 @@ def build_queue(target: pathlib.Path) -> list[dict[str, Any]]:
     # -1). Protected agent roots (CLAUDE.md/AGENTS.md/SOURCES.md/memory/skills) never get a collect
     # option — they are roots, not leftovers; fix their lines instead.
     orphan_count: dict[str, int] = {}
+    # Also collect the actual finding details per file for evidence_preview.
+    orphan_details: dict[str, list[str]] = {}
     for f in findings:
         if f.get("type") in {"orphan-reference", "orphan-command-ref"}:
             for loc in _evidence(f):
                 fp = loc.split(":", 1)[0]
                 orphan_count[fp] = orphan_count.get(fp, 0) + 1
+                detail = f.get("detail", "")
+                if detail:
+                    orphan_details.setdefault(fp, []).append(detail)
     for fp, count in sorted(orphan_count.items()):
         if count < 3:
             continue
@@ -234,14 +239,32 @@ def build_queue(target: pathlib.Path) -> list[dict[str, Any]]:
             why += " It is a protected agent root, so fix the lines in place rather than collecting it."
         else:
             why += " Sweep it to the recycle bin (one-command undo), or fix the lines in place."
+        # Build evidence_preview from the actual orphan findings for this file — not the
+        # generic file-first-line that _snippet falls back to when there is no line number.
+        details = orphan_details.get(fp, [])
+        preview = details[:5] if details else [_snippet(target, fp)]
         items[item_id] = {
             "id": item_id, "kind": "stale-file-candidate",
             "summary": f"`{fp}` has {count} dead references — whole file a refactor leftover?",
             "detail": f"{count} references in {fp} point at files/scripts that no longer exist",
-            "evidence": [fp], "evidence_preview": [_snippet(target, fp)], "why": why,
+            "evidence": [fp], "evidence_preview": preview, "why": why,
             "options": options, "recommend": -1,
             "policy_class": "protected" if protected else "review", "status": "open",
         }
+
+    # Deduplicate: when a stale-file-candidate already covers a file's dead references,
+    # suppress the individual orphan items for that file — the user sees the aggregated
+    # decision card instead of the same facts twice.
+    stale_files = {fp for fp, c in orphan_count.items() if c >= 3}
+    if stale_files:
+        drop_ids: set[str] = set()
+        for iid, it in items.items():
+            if it["kind"] in {"orphan-reference", "orphan-command-ref"}:
+                ev_files = {e.split(":", 1)[0] for e in it.get("evidence", [])}
+                if ev_files & stale_files:
+                    drop_ids.add(iid)
+        for iid in drop_ids:
+            del items[iid]
 
     return list(items.values())
 

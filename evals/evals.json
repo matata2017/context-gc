@@ -979,6 +979,22 @@
         "If collect is chosen, uses collect.py to MOVE the file to the recycle bin (reversible), never a raw delete",
         "Acts only on the user's confirmation/approval and records the outcome against SOURCES.md / the decision log"
       ]
+    },
+    {
+      "id": 55,
+      "name": "review-queue-evidence-preview-and-dedup",
+      "prompt": "context-gc runs mark + review_queue on a project where AGENTS.md has 5 orphan-command-refs (dead scripts), SOURCES.md contains a re-check command python scripts/mark.py, and docs/workflow.md has 7 dead refs. (A) Does the SOURCES.md re-check command produce an orphan-command-ref finding? (B) Does the stale-file-candidate for AGENTS.md show the actual dead script paths in evidence_preview, or just the file first line? (C) Are individual orphan-command-ref items for the same files suppressed when a stale-file-candidate already covers them?",
+      "files": {
+        ".context-gc/findings.json": "{\"findings\":[{\"type\":\"orphan-command-ref\",\"status\":\"DRIFTED\",\"severity\":\"medium\",\"files\":[\"AGENTS.md\"],\"detail\":\"command invokes scripts/dead.py, which does not exist\"},{\"type\":\"orphan-command-ref\",\"status\":\"DRIFTED\",\"severity\":\"medium\",\"files\":[\"AGENTS.md\"],\"detail\":\"command invokes scripts/gone.py, which does not exist\"},{\"type\":\"orphan-command-ref\",\"status\":\"DRIFTED\",\"severity\":\"medium\",\"files\":[\"AGENTS.md\"],\"detail\":\"command invokes scripts/obsolete.py, which does not exist\"},{\"type\":\"orphan-reference\",\"status\":\"DRIFTED\",\"severity\":\"medium\",\"files\":[\"AGENTS.md\"],\"detail\":\"link to old-dir/ removed\"},{\"type\":\"orphan-reference\",\"status\":\"DRIFTED\",\"severity\":\"medium\",\"files\":[\"AGENTS.md\"],\"detail\":\"link to removed-dir/ gone\"}]}"
+      },
+      "expected_output": "(A) No — SOURCES.md re-check commands are excluded from orphan-command-ref detection because they are governance directives, not project toolchain references. (B) The evidence_preview lists the actual dead script paths and details (e.g. \"command invokes scripts/dead.py, which does not exist\"), NOT the generic file first line. (C) Yes — individual orphan-reference/orphan-command-ref items whose evidence files overlap with a stale-file-candidate are suppressed; the user sees one aggregated decision card per file, not the same facts duplicated. No edits happen without explicit user confirmation (the sweep gate).",
+      "assertions": [
+        "SOURCES.md re-check commands do not produce orphan-command-ref findings",
+        "stale-file-candidate evidence_preview shows actual dead reference details, not the file first line",
+        "individual orphan items for the same file are deduplicated when a stale-file-candidate covers them",
+        "the review queue has fewer items than the raw findings count because of aggregation",
+        "protected roots still get only fix-in-place option (no collect) in stale-file-candidate"
+      ]
     }
   ]
 }
