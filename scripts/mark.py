@@ -466,29 +466,12 @@ def check_duplicates(target: pathlib.Path, files: list[pathlib.Path]) -> list[di
     return sorted(findings, key=lambda f: -len(f["files"]))[:25]
 
 
-def check_stale(target: pathlib.Path, files: list[pathlib.Path]) -> list[dict]:
-    now = int(time.time())
-    findings = []
-    for path in files:
-        rel = path.relative_to(target).as_posix()
-        if path.suffix.lower() not in {".md", ".mdx"}:
-            continue
-        epoch = git_last_commit_epoch(target, rel)
-        if epoch is None:
-            continue
-        age_days = (now - epoch) / 86400
-        if age_days > 365:
-            findings.append({
-                "type": "stale-doc",
-                "status": "NOT_CHECKED",
-                "severity": "low",
-                "file": rel,
-                "detail": f"not touched in git for ~{int(age_days)} days; verify it still matches its root",
-                "needs_judgment": "Old docs are suspects, not garbage. Confirm against current code before any edit.",
-            })
-    return sorted(findings, key=lambda f: f["file"])[:25]
-
-
+# NOTE: a `check_stale` based on absolute git age (">365 days untouched") was removed after a real-repo
+# audit (httpie/cli) showed it false-positived on 24/26 findings — every stable governance doc
+# (CODE_OF_CONDUCT, AUTHORS, LICENSE, CHANGELOG, ISSUE_TEMPLATEs) got flagged. "Old" is not "stale":
+# a doc is stale only relative to the code it describes. That relative signal is `check_spec_drift_candidates`
+# (code root git-newer than its doc copy); overdue re-verification is `check_stale_verification` (TTL on a
+# declared domain); an undeclared doc is `check_coverage_gaps`. Absolute age added only noise, so it's gone.
 CODE_SUFFIXES = {".py", ".js", ".ts", ".go", ".rs", ".java", ".rb", ".c", ".cpp", ".sh", ".php"}
 
 
@@ -909,7 +892,6 @@ def main() -> int:
     findings = (
         check_orphans(target, files)
         + check_duplicates(target, files)
-        + check_stale(target, files)
         + check_spec_drift_candidates(target)
         + check_coverage_gaps(target)
         + check_stale_verification(target)

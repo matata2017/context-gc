@@ -40,8 +40,13 @@ or config changes moved the implementation away from it.
 
 ### 4. Stale (陈旧)
 Describes a past reality; the root has moved on (renamed, restructured, re-scoped).
-- **Detect:** git recency — is the doc older than the code it describes? Did a referenced
-  module/flow change shape? (Generational: check recently-changed areas first.)
+- **Detect:** *relative* recency — is the doc older than **the code it describes**? That is the
+  `spec-drift-candidate` trigger (a code root git-newer than the doc copy that documents it).
+- **NOT absolute age.** A real-repo audit (httpie/cli) proved `>365 days untouched` false-positives on
+  24/26 findings — every stable governance doc (LICENSE, CODE_OF_CONDUCT, CHANGELOG, ISSUE_TEMPLATEs)
+  got flagged though none had drifted. Stale is measured against a root, never the calendar; the old
+  absolute-age `check_stale` was removed. Overdue re-verification of a *declared* domain is the
+  separate `stale-verification` TTL check.
 
 ### 5. Orphan / dangling (孤儿/悬挂)
 References something that no longer exists: a deleted file, a removed flag, a dead link, a renamed
