@@ -66,7 +66,7 @@ The metaphor is structurally exact, not decorative — GC concepts map 1:1:
 | Live/reachable | A statement that traces to a root and matches it |
 | Garbage | Stale, orphaned, contradictory, duplicated content |
 | Mark | Find roots → trace claims → flag garbage (read-only) |
-| Sweep | Reconcile/delete/compact the garbage (gated by confirmation) |
+| Sweep | Reconcile/collect-to-recycle-bin/compact the garbage (gated by confirmation; never a raw delete) |
 | Compaction | Dedupe to one authority; trim agent context |
 | Write barrier | `SOURCES.md` — authority map for cheap re-check next time |
 
@@ -82,6 +82,7 @@ Full research notes and design rationale: [`research/context-gc-research.md`](re
 - **Agent memory layers** — long-term, mid-term, and profile memory that conflict or drift; `memory-condense` writes one current memory and keeps originals as evidence
 - **A single session** — transcript/session rot: superseded plans, orphaned TODOs, repeated decisions, and tool-output bloat
 - **Preventive Minor GC** — automated agents can periodically check dirty context and apply only pre-authorized safe fixes before drift spreads
+- **Mark→Sweep bridge** — when dead references pile up in a file, the review queue offers a `collect` option (move to `.context-gc/collected/` recycle bin, reversible); the detector surfaces the garbage, the user makes the judgment, collect carries it out safely
 - **Layer 4 Hill Climbing** — accumulated patterns from successful resolutions feed back to improve drift detection automatically
 
 ## Loop Engineering
@@ -91,7 +92,7 @@ context-gc maps to the four-layer Loop Engineering architecture defined by LangC
 | Layer | context-gc | Status |
 |---|---|---|
 | L1 Agent Loop | Sidecar — doesn't participate in agent orchestration | — |
-| L2 Verification | `gc_tick --gate` — deterministic checks + LLM review after every task | ✅ |
+| L2 Verification | `hermes_adapter gate` / `gc_tick` — deterministic checks + LLM review after every task | ✅ |
 | L3 Event-driven | hooks dirty-card → auto-MARK → gc_tick on interval | ✅ |
 | L4 Hill Climbing | `analyze_patterns.py` — clusters patterns, auto-suggests optimizations | ✅ |
 
@@ -109,7 +110,7 @@ being told*:
 |---|---|---|
 | Changed a SOURCES root file (code/config) | Check the copies it may have left stale | `autonomous-trigger-after-code-change` |
 | Changed a config value (port, version, pool size) | Check the docs that document it | `autonomous-config-change-checks-docs` |
-| Completed a task in a loop (the "I'm done" moment) | Run `gc_tick --gate` to verify no drift before reporting done | `autonomous-verify-gate-before-done` |
+| Completed a task in a loop (the "I'm done" moment) | Run `hermes_adapter gate` or `gc_tick` to verify no drift before reporting done | `autonomous-verify-gate-before-done` |
 | Ran N iterations / PROGRESS.md grew | Run `gc_tick` to compact its own loop state | `autonomous-trigger-in-loop` |
 | About to write a memory that contradicts existing memory | Flag the conflict instead of silently appending | `autonomous-trigger-on-memory-write` |
 | About to delete/overwrite a memory or context file | Refuse — confirm it's garbage first; archive, don't delete | `autonomous-irreversible-op-guard` |
@@ -173,7 +174,7 @@ context-gc/
 ├── install.py                       # One-command installer (curl ... | python3)
 ├── pyproject.toml                   # ruff formatter/linter config
 ├── evals/
-│   └── evals.json                   # 35 machine-readable eval scenarios (incl. 6 autonomous-trigger)
+│   └── evals.json                   # 56 machine-readable eval scenarios (incl. 6 autonomous-trigger)
 ├── research/
 │   ├── context-gc-research.md       # GC metaphor sources and design rationale
 │   ├── loop-integration-plan.md     # Loop engine integration development plan

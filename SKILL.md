@@ -24,7 +24,7 @@ explicit and operational.
 | **Live / reachable** | A statement that traces to a root and still matches it |
 | **Garbage** | Stale, orphaned, contradictory, or duplicated content with no living root |
 | **Mark** | Find the roots, trace each claim, flag what's unreachable |
-| **Sweep** | Reconcile / delete / converge the garbage |
+| **Sweep** | Reconcile / collect-to-recycle-bin / converge the garbage (never a raw delete) |
 | **Compaction** | Dedupe to one authority; trim agent context/memory |
 | **Write barrier** | `SOURCES.md` — the authority map that catches future drift cheaply |
 
@@ -54,6 +54,13 @@ python scripts/gc_tick.py --target . --quiet    # one-line summary
 `gc_tick` chains `mark → minor_gc → review_queue → resolve --auto`. It never blocks. Pending
 escalations accumulate in `.context-gc/review-queue.json`; agent resolutions append to
 `.context-gc/decisions.jsonl` with evidence and reversibility.
+
+On the first tick after init (when `findings.json` does not yet exist), gc_tick runs a **full**
+mark instead of the usual `--dirty-only` incremental scan — this ensures the agent sees real drift
+immediately rather than a false all-zero "clean" state. On subsequent ticks, `--dirty-only` scans
+only files that changed since the last tick (tracked via `.context-gc/dirty.jsonl`). When there are
+no dirty cards, mark exits early and **preserves** the previous findings — it never overwrites them
+with an empty result.
 
 ### Autonomy policy (configurable boundary)
 
