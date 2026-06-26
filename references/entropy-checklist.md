@@ -142,3 +142,23 @@ Chinese README each slipped through one at a time until someone *felt* the gap.
   *should this be governed, under which root?* A prompt to complete the map, not a verdict. The fix for
   "X wasn't detected" is not to patch X by hand (whack-a-mole) but to let undeclared files surface
   themselves. Narrow on purpose — only governable top-level docs, not internal demo/reference files.
+
+## Drift axes the mechanical checks now trigger on (机械触发器，判断仍归人)
+
+Each is a `NEEDS_JUDGMENT` trigger built from the SOURCES.md declaration — a prompt to go look, never
+a verdict. They cover the axes a fact drifts along beyond simple value/link/duplicate:
+
+- **stale-verification (TTL):** a domain's `Last verified` is older than ~120 days → the SYNCED claim
+  has perished; re-run its Re-check and bump the date. *Old ≠ drifted, but it earns a re-look.*
+- **orphaned-root (deletion):** a domain's root file was deleted → its copies govern nothing now.
+  Promote a copy, remove the domain, or mark HISTORICAL.
+- **implementation-gap (reverse spec-drift):** a DOC/spec root is git-newer than its CODE copy → the
+  code may not yet implement the updated spec. The mirror of code-outpaces-doc; don't rewrite the spec down.
+- **env-matrix-drift (environment axis):** 2+ per-environment config siblings (`config.dev`/`config.prod`)
+  not declared FORK → is the divergence intentional (declare FORK) or accidental (reconcile)?
+- **structural-drift (shape, not value):** a code root's public CLI flags are absent from its doc copy →
+  the doc describes an older interface shape. Narrow to CLI flags on purpose — every value can be "right"
+  yet the interface undocumented.
+- **external-root-drift (root outside the repo):** a domain's root is a URL/API → local checks can never
+  verify it; a permanent blind spot. Prompt to probe the upstream. context-gc stays zero-dependency and
+  does NOT fetch it.

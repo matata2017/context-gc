@@ -752,6 +752,113 @@
         "Does not auto-edit SOURCES.md; surfaces the gap for human judgment",
         "Requires confirmation before changing SOURCES.md; treats the authority map as human-owned"
       ]
+    },
+    {
+      "id": 42,
+      "name": "stale-verification-overdue-domain",
+      "prompt": "Run context-gc. SOURCES.md declares a domain whose 'Last verified: 2020-01-01' is years old, though the files still exist. Decide what to surface.",
+      "files": {
+        "SOURCES.md": "### `legacy`\n\n- **Root:** `app.py`\n- **Copies:**\n  - `README.md` - doc\n- **Re-check:** `pytest`\n- **Last verified:** 2020-01-01\n- **Status:** `SYNCED`\n",
+        "app.py": "x=1\n",
+        "README.md": "doc\n"
+      },
+      "expected_output": "context-gc raises a stale-verification / NEEDS_JUDGMENT: the Last verified timestamp is overdue, so the SYNCED claim has perished and earns a re-check. A prompt to re-run the domain's Re-check and bump the date, not a verdict that drift occurred. Old is not the same as drifted. Mentions SOURCES.md as where re-verification is recorded; requires confirmation.",
+      "assertions": [
+        "Flags the domain's Last verified as overdue for re-check",
+        "Treats it as a perishable claim (old != drifted), a prompt not a verdict",
+        "Suggests re-running the domain's Re-check and bumping Last verified",
+        "Does not auto-edit anything; requires confirmation",
+        "Mentions SOURCES.md authority map as where verification is recorded"
+      ]
+    },
+    {
+      "id": 43,
+      "name": "orphaned-root-deleted-file",
+      "prompt": "Run context-gc. A SOURCES.md domain declares scripts/old_runner.py as its root, but that file was deleted. The copies still exist. Decide what to surface.",
+      "files": {
+        "SOURCES.md": "### `runner`\n\n- **Root:** `scripts/old_runner.py`\n- **Copies:**\n  - `README.md` - doc\n- **Status:** `SYNCED`\n",
+        "README.md": "doc\n"
+      },
+      "expected_output": "context-gc raises an orphaned-root / NEEDS_JUDGMENT: the domain's root no longer exists, so its copies now govern nothing. The agent asks whether a copy became the new root, the domain should be removed, or marked HISTORICAL, rather than auto-deciding. Requires confirmation; mentions SOURCES.md authority map.",
+      "assertions": [
+        "Detects the domain's root file no longer exists on disk",
+        "Recognizes the copies are now unanchored / govern nothing",
+        "Asks whether a copy is the new root, or to remove/mark HISTORICAL the domain",
+        "Does not auto-edit SOURCES.md; requires confirmation",
+        "Mentions SOURCES.md authority map"
+      ]
+    },
+    {
+      "id": 44,
+      "name": "implementation-gap-spec-newer-than-code",
+      "prompt": "Run context-gc. SOURCES.md declares docs/spec.md as the root and src/impl.py as a copy that implements it. docs/spec.md was committed AFTER src/impl.py - the spec was updated and the code hasn't caught up. Decide what to surface.",
+      "files": {
+        "SOURCES.md": "### `feature-spec`\n\n- **Root:** `docs/spec.md`\n- **Copies:**\n  - `src/impl.py` - implements the spec\n- **Status:** `SYNCED`\n",
+        "docs/spec.md": "Spec v2: now requires retries.\n",
+        "src/impl.py": "def run(): pass\n"
+      },
+      "expected_output": "context-gc raises an implementation-gap / NEEDS_JUDGMENT: the spec root is git-newer than the code copy, meaning the spec was updated and the code may not yet implement it. The reverse of code-outpaces-doc: here the spec is intent and the code lags, so the agent flags an implementation gap, not stale docs, and does not rewrite the spec down to old code. Requires confirmation; mentions SOURCES.md.",
+      "assertions": [
+        "Detects the spec root is git-newer than the code copy",
+        "Frames it as an implementation gap (code lags the updated spec), not stale docs",
+        "Does not propose rewriting the spec down to the old code",
+        "Treats the spec as intent / root unless told otherwise",
+        "Requires confirmation; mentions SOURCES.md authority map"
+      ]
+    },
+    {
+      "id": 45,
+      "name": "env-matrix-drift-undeclared-fork",
+      "prompt": "Run context-gc. The repo has config.dev.yaml and config.prod.yaml (sibling per-environment configs) that are not declared as a FORK in SOURCES.md. Decide what to surface.",
+      "files": {
+        "config.dev.yaml": "url: localhost\ndebug: true\n",
+        "config.prod.yaml": "url: prod.example.com\ndebug: false\n",
+        "SOURCES.md": "### `other`\n\n- **Root:** `app.py`\n- **Status:** `SYNCED`\n",
+        "app.py": "x=1\n"
+      },
+      "expected_output": "context-gc raises an env-matrix-drift / NEEDS_JUDGMENT for the config.dev/config.prod siblings: per-environment configs are supposed to diverge, but only intentionally. Since not declared FORK, the agent asks whether the divergence is deliberate (declare FORK so it stops re-flagging) or accidental (reconcile to a root). Does not force them to converge. Mentions SOURCES.md / FORK; requires confirmation.",
+      "assertions": [
+        "Flags the dev/prod config siblings as an env matrix not declared FORK",
+        "Asks whether the divergence is intentional (FORK) or accidental drift",
+        "Does not force per-environment configs to converge",
+        "Proposes declaring FORK in SOURCES.md to stop re-flagging if intentional",
+        "Requires confirmation; mentions SOURCES.md authority map"
+      ]
+    },
+    {
+      "id": 46,
+      "name": "structural-drift-undocumented-cli-flags",
+      "prompt": "Run context-gc. SOURCES.md declares cli.py as root for a tool, with usage.md as the doc copy. cli.py defines output-format, dry-run, verbose flags via argparse, but usage.md mentions none of them. Decide what to surface.",
+      "files": {
+        "SOURCES.md": "### `cli`\n\n- **Root:** `cli.py`\n- **Copies:**\n  - `usage.md` - documents the CLI\n- **Status:** `SYNCED`\n",
+        "cli.py": "import argparse\nap=argparse.ArgumentParser()\nap.add_argument('--output-format')\nap.add_argument('--dry-run')\nap.add_argument('--verbose')\n",
+        "usage.md": "# Usage\nThe tool takes a target.\n"
+      },
+      "expected_output": "context-gc raises a structural-drift / NEEDS_JUDGMENT for usage.md: the code's public CLI grew but the doc mentions none of the new flags - the doc describes an older shape. Structure drift, not value drift: every value may be right yet the interface is undocumented. The agent proposes documenting the new flags after confirmation. Mentions SOURCES.md.",
+      "assertions": [
+        "Detects CLI flags the code exposes that the doc never mentions",
+        "Frames it as structural drift (interface shape), distinct from value drift",
+        "Proposes documenting the new flags rather than auto-editing",
+        "Requires confirmation before editing the doc",
+        "Mentions SOURCES.md authority map"
+      ]
+    },
+    {
+      "id": 47,
+      "name": "external-root-drift-url-root",
+      "prompt": "Run context-gc. A SOURCES.md domain declares an external root, a URL https://api.example.com/v1/schema, with local docs as copies. Decide what context-gc can and cannot do here.",
+      "files": {
+        "SOURCES.md": "### `api`\n\n- **Root:** `https://api.example.com/v1/schema`\n- **Copies:**\n  - `README.md` - documents the API\n- **Status:** `SYNCED`\n",
+        "README.md": "The API returns a user object.\n"
+      },
+      "expected_output": "context-gc raises an external-root-drift / NEEDS_JUDGMENT: the domain's root is outside the repo (a URL/API), so local git-mtime checks can never verify it - a permanent blind spot. The agent is prompted to probe the external root and confirm the local copies still match, but context-gc itself does NOT fetch the URL (zero-dependency). Requires confirmation; mentions SOURCES.md.",
+      "assertions": [
+        "Recognizes the root is external (a URL/API) and unverifiable by local checks",
+        "States context-gc will not fetch the external root itself (zero-dependency)",
+        "Prompts the human/agent to probe the external root and confirm copies match",
+        "Treats it as a permanent blind spot that needs an explicit re-check trigger",
+        "Requires confirmation; mentions SOURCES.md authority map"
+      ]
     }
   ]
 }

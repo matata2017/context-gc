@@ -30,6 +30,7 @@ import time
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from _common import (  # noqa: E402
     DEFAULT_EXCLUDES,
+    _excluded,
     git_last_commit_epoch,
     iter_agent_context_files,
     iter_context_files,
@@ -605,6 +606,258 @@ def _governable_toplevel_files(target: pathlib.Path) -> list[str]:
     return out
 
 
+def _sources_domains(target: pathlib.Path):
+    """Parse SOURCES.md into domains (reuses minor_gc), or [] if absent/unparseable."""
+    src = target / "SOURCES.md"
+    if not src.exists():
+        return []
+    try:
+        import minor_gc
+        return minor_gc.parse_sources(src)
+    except Exception:
+        return []
+
+
+def _domain_last_verified(target: pathlib.Path) -> dict[str, str]:
+    """Map domain name → its 'Last verified: YYYY-MM-DD' string (parse_sources drops this field)."""
+    src = target / "SOURCES.md"
+    out: dict[str, str] = {}
+    if not src.exists():
+        return out
+    cur = None
+    for line in src.read_text(encoding="utf-8").splitlines():
+        m = re.match(r"###\s+`?([^`—#]+)`?", line)
+        if m:
+            cur = m.group(1).strip()
+            continue
+        if cur:
+            mv = re.search(r"\*\*Last verified:\*\*\s*`?(\d{4}-\d{2}-\d{2})`?", line)
+            if mv:
+                out[cur] = mv.group(1)
+    return out
+
+
+def check_stale_verification(target: pathlib.Path, max_age_days: int = 120) -> list[dict]:
+    """TTL drift — a SOURCES domain whose `Last verified` is older than max_age_days needs re-check.
+
+    The authority map records when each domain was last confirmed against its root. That timestamp is
+    itself a perishable claim: a domain verified months ago may have silently drifted since. This
+    surfaces domains overdue for re-verification — a prompt to re-run the domain's Re-check, not a
+    verdict that it drifted.
+    """
+    now = int(time.time())
+    findings = []
+    for name, datestr in _domain_last_verified(target).items():
+        try:
+            y, mo, d = (int(x) for x in datestr.split("-"))
+            epoch = int(time.mktime((y, mo, d, 0, 0, 0, 0, 0, -1)))
+        except Exception:
+            continue
+        age = (now - epoch) / 86400
+        if age > max_age_days:
+            findings.append({
+                "type": "stale-verification",
+                "status": "NEEDS_JUDGMENT",
+                "severity": "low",
+                "file": "SOURCES.md",
+                "detail": f"domain `{name}` last verified {datestr} (~{int(age)} days ago) — overdue for re-check",
+                "needs_judgment": f"Re-run `{name}`'s Re-check command and confirm it still holds, then bump Last verified. The timestamp is a claim that perishes; old ≠ drifted, but it earns a re-look.",
+            })
+    return findings
+
+
+def check_orphaned_roots(target: pathlib.Path) -> list[dict]:
+    """Deletion drift — a SOURCES domain whose root file no longer exists on disk.
+
+    The reverse of orphan-reference (which catches a reference to a missing file). Here the *root* —
+    the authority a domain is built on — was deleted, leaving the domain (and its copies) governing
+    nothing. The copies become unanchored: still declared, but their truth source is gone.
+    """
+    findings = []
+    for d in _sources_domains(target):
+        root = (d.root or "").strip().rstrip("/")
+        if not root or d.status in {"HISTORICAL"}:
+            continue
+        # External roots (URLs, or paths with no suffix that look like services) are out of scope here.
+        if URL_RE.search(root) or "://" in root:
+            continue
+        rp = target / root
+        if not rp.exists():
+            findings.append({
+                "type": "orphaned-root",
+                "status": "NEEDS_JUDGMENT",
+                "severity": "medium",
+                "file": "SOURCES.md",
+                "detail": f"domain `{d.name}` root `{root}` no longer exists; its copies now govern nothing",
+                "needs_judgment": f"The root `{root}` was deleted. Did a copy become the new root? Should the domain be removed, or marked HISTORICAL? Decide before the orphaned copies drift unwatched.",
+            })
+    return findings
+
+
+def check_implementation_gap(target: pathlib.Path) -> list[dict]:
+    """Reverse spec-drift — a DOC root is git-newer than the CODE copy that should implement it.
+
+    spec-drift-candidate catches "code moved, doc lags". This is the mirror: a spec/design DOC is the
+    declared root and a CODE file is its copy, but the code is git-OLDER than the spec — the spec was
+    updated and the code has not caught up yet (an implementation gap). SKILL names this
+    `flag_implementation_gap`; this is its mechanical trigger.
+    """
+    findings = []
+    for d in _sources_domains(target):
+        root = (d.root or "").strip()
+        if not root or pathlib.PurePath(root).suffix.lower() not in {".md", ".mdx"}:
+            continue  # only DOC/spec roots
+        if d.status in {"FORK", "HISTORICAL", "UNKNOWN_ROOT"}:
+            continue
+        root_epoch = git_last_commit_epoch(target, root)
+        if root_epoch is None:
+            continue
+        for copy in d.copies:
+            copy = copy.strip()
+            if pathlib.PurePath(copy).suffix.lower() not in CODE_SUFFIXES:
+                continue  # only CODE copies can have an implementation gap
+            copy_epoch = git_last_commit_epoch(target, copy)
+            if copy_epoch is None or root_epoch <= copy_epoch:
+                continue  # code is same-age-or-newer → presumed implemented
+            findings.append({
+                "type": "implementation-gap",
+                "status": "NEEDS_JUDGMENT",
+                "severity": "medium",
+                "file": copy,
+                "detail": f"spec root `{root}` committed after code `{copy}`; the code may not yet implement the updated spec",
+                "needs_judgment": f"Read `{root}` and `{copy}`: does the code implement the current spec? If the spec is the intent and code lags, this is an implementation gap to flag, not a doc to rewrite.",
+            })
+    return findings
+
+
+ENV_FILE_RE = re.compile(r"(^|/)\.env(\.[\w-]+)?$|(^|/)[\w-]*config[\w.-]*\.(ya?ml|toml|ini|json)$", re.I)
+
+
+def check_env_matrix_drift(target: pathlib.Path) -> list[dict]:
+    """Environment drift — env/config files that exist but aren't declared FORK or governed.
+
+    dev/staging/prod configs (.env.local, config.prod.yaml, ...) are SUPPOSED to diverge — but only
+    intentionally (a declared FORK). An env-looking file that is neither governed nor marked FORK is a
+    candidate for unintentional drift: is its divergence deliberate, or did it quietly fall out of sync
+    with the others? Low severity, narrow to env/config shapes, excludes the demo fixtures.
+    """
+    declared = set()
+    fork_domains = []
+    for d in _sources_domains(target):
+        if d.root:
+            declared.add(d.root.strip().rstrip("/"))
+        for c in d.copies:
+            declared.add(c.strip())
+        if d.status == "FORK":
+            fork_domains.append(d.name)
+    findings = []
+    seen = []
+    for path in target.rglob("*"):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(target).as_posix()
+        if _excluded(rel, DEFAULT_EXCLUDES) or "examples/" in rel or "templates/" in rel:
+            continue
+        if rel.endswith(".example") or rel.endswith(".sample"):
+            continue
+        if ENV_FILE_RE.search(rel) and rel not in declared:
+            seen.append(rel)
+    # Only flag when there's an actual MATRIX: 2+ env/config files sharing a stem (dev/prod siblings).
+    by_stem: dict[str, list[str]] = {}
+    for rel in seen:
+        stem = re.sub(r"\.(local|dev|prod|production|staging|test|example)\b", "", pathlib.PurePath(rel).name, flags=re.I)
+        by_stem.setdefault(f"{pathlib.PurePath(rel).parent}/{stem}", []).append(rel)
+    for group in by_stem.values():
+        if len(group) >= 2:
+            findings.append({
+                "type": "env-matrix-drift",
+                "status": "NEEDS_JUDGMENT",
+                "severity": "low",
+                "files": sorted(group),
+                "detail": f"{len(group)} env/config siblings not declared FORK; their divergence may be unintentional",
+                "needs_judgment": "If these intentionally differ per environment, declare the relationship as FORK in SOURCES.md so it stops re-flagging. If they should agree, reconcile to a root.",
+            })
+    return findings
+
+
+def check_structural_drift(target: pathlib.Path) -> list[dict]:
+    """Structural drift — a code file's PUBLIC INTERFACE gained a handle its doc never mentions.
+
+    Value/link/duplicate checks compare strings; this compares SHAPE. The hard part is "public": a
+    naive scan of every `def`'s params floods on internal helpers (cfg, argv, Any, section_name...).
+    So this only looks at genuinely public surface a doc is expected to track:
+      - argparse CLI flags:  add_argument("--foo")   → docs should mention `--foo`
+    A CLI flag the code defines but no doc copy mentions is a real structural gap. Narrow on purpose —
+    better to catch only CLI drift reliably than to flood on every internal function parameter.
+    """
+    findings = []
+    for d in _sources_domains(target):
+        root = (d.root or "").strip()
+        if not root or pathlib.PurePath(root).suffix.lower() not in CODE_SUFFIXES:
+            continue
+        if d.status in {"FORK", "HISTORICAL", "UNKNOWN_ROOT"}:
+            continue
+        rp = target / root
+        if not rp.exists():
+            continue
+        code = _read_text(rp)
+        # Public surface = CLI flags the tool exposes. These are what user-facing docs must track.
+        flags = set(re.findall(r"add_argument\(\s*[\"'](--[a-z][a-z0-9-]+)[\"']", code))
+        if not flags:
+            continue
+        doc_copies = [c.strip() for c in d.copies if pathlib.PurePath(c.strip()).suffix.lower() in {".md", ".mdx"}]
+        if not doc_copies:
+            continue
+        doc_text = ""
+        for c in doc_copies:
+            cp = target / c
+            if cp.exists():
+                doc_text += _read_text(cp)
+        undocumented = sorted(f for f in flags if f not in doc_text)
+        if undocumented and len(undocumented) >= max(2, len(flags) // 2):
+            findings.append({
+                "type": "structural-drift",
+                "status": "NEEDS_JUDGMENT",
+                "severity": "low",
+                "file": doc_copies[0],
+                "detail": f"code root `{root}` exposes CLI flags not mentioned in its docs: {', '.join(undocumented[:6])}",
+                "needs_judgment": f"The tool's public CLI grew. Confirm whether `{doc_copies[0]}` should document {', '.join(undocumented[:4])} — structure drift, not value drift.",
+            })
+    return findings
+
+
+def check_external_root_drift(target: pathlib.Path) -> list[dict]:
+    """External-root drift — a domain whose root is OUTSIDE the repo (a URL/API/upstream) can't be
+    checked by local git mtime, so it silently never gets verified.
+
+    SKILL says roots can be external (an API, a server, an upstream lib). But every mechanical check
+    here works on local files. An external-root domain is therefore in a permanent blind spot: nothing
+    triggers a re-check when the upstream changes. This surfaces those domains so a human/agent probes
+    the external root — context-gc stays zero-dependency and does NOT fetch the URL itself.
+    """
+    findings = []
+    for d in _sources_domains(target):
+        root = (d.root or "").strip()
+        if not root:
+            continue
+        is_external = bool(URL_RE.search(root) or "://" in root) or (
+            "/" not in root and "." not in root and root.lower() not in {"code"} and len(root.split()) > 1
+        )
+        if not is_external:
+            continue
+        if d.status in {"HISTORICAL", "FORK"}:
+            continue
+        findings.append({
+            "type": "external-root-drift",
+            "status": "NEEDS_JUDGMENT",
+            "severity": "medium",
+            "file": "SOURCES.md",
+            "detail": f"domain `{d.name}` has an external root `{root}` that local checks can never verify",
+            "needs_judgment": f"Probe the external root `{root}` (call the API / check the upstream version) and confirm the local copies still match it. context-gc won't fetch it for you — this is the trigger to do it.",
+        })
+    return findings
+
+
 SEV_ICON = {"high": "🔴", "medium": "🟡", "low": "🟢"}
 
 
@@ -659,6 +912,12 @@ def main() -> int:
         + check_stale(target, files)
         + check_spec_drift_candidates(target)
         + check_coverage_gaps(target)
+        + check_stale_verification(target)
+        + check_orphaned_roots(target)
+        + check_implementation_gap(target)
+        + check_env_matrix_drift(target)
+        + check_structural_drift(target)
+        + check_external_root_drift(target)
         + check_dead_skill_refs(target, agent_files)
         + check_agent_instruction_clusters(target, agent_files)
         + check_memory_leak(target, agent_files)
