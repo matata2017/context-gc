@@ -995,6 +995,20 @@
         "the review queue has fewer items than the raw findings count because of aggregation",
         "protected roots still get only fix-in-place option (no collect) in stale-file-candidate"
       ]
+    },
+    {
+      "id": 56,
+      "name": "gc-tick-first-run-full-mark-and-dirty-only-preserves-findings",
+      "prompt": "context-gc is installed on a fresh project (init just ran). (A) What happens when gc_tick runs for the first time — does it find drift, or report zero because dirty cards are empty? (B) After a full mark finds 10 issues, a gc_tick runs with --dirty-only and there are no dirty cards. Does the findings.json still contain the 10 issues, or was it overwritten to empty?",
+      "files": {},
+      "expected_output": "(A) On the first tick after init, gc_tick detects that findings.json does not exist (or has no findings) and runs a FULL mark instead of --dirty-only. So it finds drift immediately — not zero. (B) When --dirty-only has no dirty cards to scan, mark.py exits early WITHOUT overwriting findings.json. The previous 10 findings are retained. No edits happen without explicit user confirmation (the sweep gate). SOURCES.md write barrier is preserved across ticks — dirty-only never invalidates it.",
+      "assertions": [
+        "gc_tick runs a full mark (not --dirty-only) on first tick when no findings.json exists",
+        "gc_tick runs a full mark when findings.json exists but contains zero findings",
+        "mark.py --dirty-only with no dirty cards preserves the existing findings.json instead of overwriting it with an empty result",
+        "the first tick after init produces real escalated/pending items, not all zeros",
+        "findings from a previous full mark are not lost when a subsequent dirty-only tick has nothing incremental to scan"
+      ]
     }
   ]
 }

@@ -937,7 +937,14 @@ def main() -> int:
     all_files = list(iter_context_files(target, excludes))
     files = _dirty_files(target, excludes) if a.dirty_only else all_files
     if a.dirty_only and not files:
-        files = []
+        # No dirty cards — nothing incremental to scan.  Do NOT overwrite findings.json
+        # with an empty result; a previous full mark's findings are still valid.
+        if a.json_only:
+            existing = target / ".context-gc" / "findings.json"
+            print(existing if existing.exists() else "")
+        else:
+            print("No dirty cards — incremental mark skipped (previous findings retained).")
+        return 0
     agent_files = list(iter_agent_context_files(target, excludes))
     if a.dirty_only:
         dirty_rels = {_rel(target, p) for p in files}

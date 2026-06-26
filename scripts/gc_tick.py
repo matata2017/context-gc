@@ -84,8 +84,13 @@ def run_tick(target: pathlib.Path) -> dict:
             scope_note = f"branch {old_scope['branch']} → {new_scope['branch']}: stale dirty cards invalidated"
         write_scope(target, new_scope)
 
-    # 1) detect (read-only) — dirty-only so a loop tick is cheap.
-    steps["mark"], _ = _run("mark.py", "--dirty-only", "--json-only", target=target)
+    # 1) detect (read-only).  Use --dirty-only for cheap incremental ticks, but fall back
+    #    to a full scan when there are no findings yet (first tick after init, or after a
+    #    scope change wiped them).  A full scan on first tick ensures the agent sees drift
+    #    immediately instead of ticking to zero until the first edit creates a dirty card.
+    existing_findings = (state / "findings.json").exists() and bool(_load_json(state / "findings.json").get("findings"))
+    mark_args = ["--dirty-only", "--json-only"] if existing_findings else ["--json-only"]
+    steps["mark"], _ = _run("mark.py", *mark_args, target=target)
     cfg_path = target / ".context-gc" / "config.yml"
     cfg_minor_apply_safe = False
     if cfg_path.exists():
