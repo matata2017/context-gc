@@ -945,6 +945,23 @@
         "Frames the doc as teaching a command that fails every run; proposes repoint or retire as a judgment call",
         "Does not auto-edit the doc; requires confirmation and records the decision against SOURCES.md"
       ]
+    },
+    {
+      "id": 53,
+      "name": "collect-garbage-to-recycle-bin-reversible",
+      "prompt": "After review, the user has confirmed that docs/dead-toolchain.md is a stale orphan — it documents a build system deleted in a refactor and nothing points to it anymore. The user wants it OUT of the live docs so it stops confusing readers and agents, but is nervous about losing it forever. How should context-gc sweep it — and how is this different from deleting it?",
+      "files": {
+        "docs/dead-toolchain.md": "# Old build system\nRun ./old-build.sh to compile.\n",
+        "SOURCES.md": "### `docs`\n\n- **Root:** `src/`\n- **Status:** `SYNCED`\n"
+      },
+      "expected_output": "context-gc sweeps it by COLLECTING, not deleting: it moves docs/dead-toolchain.md into a recycle bin (.context-gc/collected/) via scripts/collect.py. This is a real sweep — the file leaves the live docs, its original location is cleared, so the rot is gone from where readers and agents see it — but it is fully recoverable: moved, not freed, restorable byte-for-byte with `collect.py --restore <id>`. The move is recorded in the manifest and decisions.jsonl with reversible=true and the recycle-bin path. context-gc never issues a raw delete, because a 'garbage' verdict is a truth judgment that can be wrong; quarantine is the safe form of Sweep. It still requires the user's confirmation before collecting (the Phase-2 gate holds; the recycle bin lowers the stakes but does not replace confirmation), and protected agent roots (CLAUDE.md, memory/**, skills/**) would be refused without --force. The authority decision is reflected in SOURCES.md.",
+      "assertions": [
+        "Sweeps by MOVING the file to a recycle bin (.context-gc/collected/), never a raw delete",
+        "Notes the original location is cleared — a real sweep, not just an annotation or strike-through",
+        "Stresses reversibility: moved not freed, restorable byte-for-byte, recorded reversible=true in manifest/decisions",
+        "Protected agent roots (CLAUDE.md/memory/skills) are refused without an explicit override",
+        "Still requires user confirmation/approval before collecting and reflects the decision in SOURCES.md"
+      ]
     }
   ]
 }

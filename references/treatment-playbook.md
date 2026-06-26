@@ -52,6 +52,31 @@ For each garbage type in the entropy report, pick the treatment below.
 | **Preserve as history.** Do not rewrite an ADR, changelog, incident report, or release note just because the current root changed. | Add a short status line or pointer to the current root if readers may confuse history for current instructions. |
 | **Archive** if the historical material is cluttering operational docs. | Keep the historical record reachable; do not collect it as garbage unless the user confirms it has no value. |
 
+## Collect — the reversible Sweep (move, never delete)
+
+Every "remove it" treatment above (delete an orphan, strike a dead command, retire a stale section,
+archive historical clutter) runs through ONE safe mechanism: `scripts/collect.py`. context-gc never
+issues a raw `delete` — a "garbage" verdict is a truth judgment that can be wrong. Instead it MOVES the
+item to a recycle bin (`.context-gc/collected/`):
+
+```bash
+python scripts/collect.py --target . --collect <path> --reason "why it's garbage"
+python scripts/collect.py --target . --restore <id>     # full undo, byte-for-byte
+python scripts/collect.py --target . --list             # what's in the bin
+```
+
+- **A real sweep:** the item leaves the live context — its original location is cleared, not merely
+  annotated. The rot is gone from where readers and agents see it.
+- **But recoverable:** moved, not freed. `restore` puts it back exactly; the manifest + decisions.jsonl
+  record every move with `reversible: true`.
+- **Protected by default:** agent roots (CLAUDE.md / SOUL.md / AGENTS.md / SOURCES.md, `memory/**`,
+  `skills/**`) are refused without `--force` — never quietly sweep an agent's own root context.
+- **The Phase-2 gate still applies:** collecting is a write. Confirm with the user first, as with any
+  sweep; the recycle bin lowers the stakes (undo is one command) but does not replace confirmation.
+
+This is what lets context-gc be a real garbage *collector*, not just a detector: it can finally carry
+garbage OUT of the live set without ever risking the delete that its truth-uncertainty forbids.
+
 ## Agent-context compaction
 
 | Drift type | Treatment | Notes |

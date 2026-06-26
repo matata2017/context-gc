@@ -195,6 +195,7 @@ context-gc/
 │   ├── minor_gc.py                  # Preventive Minor GC with pre-authorized safe fixers
 │   ├── review_queue.py              # Aggregate open decisions → review-queue.json
 │   ├── resolve.py                   # Agent self-resolve within autonomy policy + audit log
+│   ├── collect.py                   # The safe Sweep — move garbage to a recycle bin (never delete) + restore
 │   ├── gc_tick.py                   # One governance tick — any loop/agent entry point
 │   ├── analyze_patterns.py          # Layer 4 hill climbing — cluster patterns, suggest optimizations
 │   ├── session_mark.py              # MARK exported transcripts for session context rot
