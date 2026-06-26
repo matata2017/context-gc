@@ -438,6 +438,53 @@ def check_orphans(target: pathlib.Path, files: list[pathlib.Path]) -> list[dict]
     return findings
 
 
+# A command that invokes a script by path — `python tools/build.py`, `bash scripts/run.sh`. Captures
+# the first path-like argument of a known interpreter, so we check the invoked script (not its args).
+CMD_REF_RE = re.compile(
+    r"\b(?:python3?|node|bash|sh|ruby|deno|ts-node|go run|pytest|php|perl)\s+([A-Za-z0-9_][\w\-./]*\.[A-Za-z0-9]+)"
+)
+CMD_PLACEHOLDER_RE = re.compile(r"path/to|your[-_]|/example|<[^>]+>|\.\.\.|YOUR|\$\{", re.I)
+
+
+def check_orphan_command_refs(target: pathlib.Path, files: list[pathlib.Path]) -> list[dict]:
+    """Orphan in a COMMAND — a script path invoked in a doc that does not exist on disk.
+
+    `check_orphans` follows markdown links `[](path)` only; a script path inside a fenced command
+    (`python junli-ai-novel/scripts/check.py`) is invisible to it. Yet that is the most damaging
+    stale-doc form: the doc keeps 'teaching' a toolchain a refactor deleted, so the workflow fails
+    silently every run. Found on a real novel repo where 4 such commands across 3 docs all pointed at
+    scripts that no longer existed — 100% missed by every other check. Kept narrow to control noise:
+    only the invoked script of a known interpreter, must have a directory + extension, and not a URL /
+    absolute path / placeholder. Severity rises when the same dead path is taught in 2+ docs.
+    """
+    seen: dict[str, list[str]] = {}
+    for path in files:
+        if path.suffix.lower() not in {".md", ".mdx"}:
+            continue
+        rel = _rel(target, path)
+        text = _read_text(path)
+        for m in CMD_REF_RE.finditer(text):
+            ref = m.group(1)
+            if "/" not in ref or URL_RE.search(ref) or ref.startswith("/") or CMD_PLACEHOLDER_RE.search(ref):
+                continue
+            if (target / ref).exists() or (path.parent / ref).exists():
+                continue
+            seen.setdefault(ref, [])
+            if rel not in seen[ref]:
+                seen[ref].append(rel)
+    findings = []
+    for ref, locs in sorted(seen.items()):
+        findings.append({
+            "type": "orphan-command-ref",
+            "status": "DRIFTED",
+            "severity": "medium" if len(locs) >= 2 else "low",
+            "files": sorted(locs),
+            "detail": f"command invokes `{ref}`, which does not exist (taught in {len(locs)} doc(s)); a refactor likely moved or deleted it",
+            "needs_judgment": f"Does `{ref}`'s toolchain still exist under another path? Repoint the command, or mark the step retired — until then the doc teaches a command that fails every run.",
+        })
+    return findings
+
+
 def check_duplicates(target: pathlib.Path, files: list[pathlib.Path]) -> list[dict]:
     seen: dict[str, list[str]] = {}
     for path in files:
@@ -892,6 +939,7 @@ def main() -> int:
 
     findings = (
         check_orphans(target, files)
+        + check_orphan_command_refs(target, files)
         + check_duplicates(target, files)
         + check_spec_drift_candidates(target)
         + check_coverage_gaps(target)

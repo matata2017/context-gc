@@ -928,6 +928,23 @@
         "Regenerates the queue for the current branch (re-run tick/mark) before reviewing",
         "Any eventual resolution still requires the user's confirmation/approval and is recorded in SOURCES.md"
       ]
+    },
+    {
+      "id": 52,
+      "name": "orphan-command-ref-dead-script-in-doc",
+      "prompt": "A workflow doc teaches two required commands: `python tools/validate.py chapter.md` and `python scripts/build.py`. The file scripts/build.py exists, but tools/validate.py does not — a refactor moved that toolchain away and the doc was never updated. What does context-gc surface, and what does it NOT touch?",
+      "files": {
+        "docs/workflow.md": "## Steps\nRun the validator:\n```bash\npython tools/validate.py chapter.md\n```\nThen build:\n```bash\npython scripts/build.py\n```\n",
+        "scripts/build.py": "print('build')\n"
+      },
+      "expected_output": "context-gc raises an orphan-command-ref / DRIFTED for `tools/validate.py`: the doc teaches a command that invokes a script which does not exist, so the step fails silently every run. This is the most-missed form of stale doc — the dead path is inside a fenced command, not a markdown link, so an ordinary link check (and a human skim) sails right past it. It must NOT flag `python scripts/build.py`, whose script exists. The fix is judgment: does tools/validate.py's toolchain live under another path now (repoint the command) or was the step retired (mark it so)? It does not auto-edit the doc — it surfaces the dead command for the maintainer to repoint or retire on confirmation, and records the decision against SOURCES.md so the workflow doc stops teaching a command that fails.",
+      "assertions": [
+        "Flags the command that invokes tools/validate.py as orphan/DRIFTED because the script does not exist",
+        "Does NOT flag python scripts/build.py, whose script exists on disk",
+        "Notes this is a stale-doc form ordinary link checks miss because the dead path sits inside a command, not a markdown link",
+        "Frames the doc as teaching a command that fails every run; proposes repoint or retire as a judgment call",
+        "Does not auto-edit the doc; requires confirmation and records the decision against SOURCES.md"
+      ]
     }
   ]
 }
