@@ -20,6 +20,7 @@ import argparse
 import collections
 import json
 import pathlib
+import subprocess
 import sys
 import time
 
@@ -109,7 +110,7 @@ def render_sources(domains, target_name: str) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def render_config(excludes: list[str]) -> str:
+def render_config(excludes: list[str], hands_off: bool = False) -> str:
     lines = [
         "# context-gc config (init-generated). Edit to refine scope.",
         "scope:",
@@ -140,7 +141,7 @@ def render_config(excludes: list[str]) -> str:
         "  enabled: true       # detect + queue drift in the background; apply_safe gates any auto-edit",
         "  interval_dirty_cards: 10",
         "  interval_turns: 10",
-        "  apply_safe: false   # OFF until the user authorizes auto-fix once (setup asks); then scalar/pointer only",
+        f"  apply_safe: {'true' if hands_off else 'false'}   # {'takeover/hands-off: auto-apply scalar+pointer fixes (memory/protected stay never-auto)' if hands_off else 'OFF until the user authorizes auto-fix once (setup asks); then scalar/pointer only'}",
         "  max_files_per_run: 3",
         "  max_seconds: 5",
         "  mode: conservative",
@@ -169,7 +170,7 @@ def render_config(excludes: list[str]) -> str:
         "  # Agent-first: a loop/agent self-resolves the drift it is ALLOWED to; the rest escalates to you.",
         "  # You own this boundary. level off|assist|auto|full. never_auto is a hard floor enforced in code:",
         "  # even full will not let an agent touch protected files, deletes, memory writes, or ambiguous items.",
-        "  level: assist",
+        f"  level: {'auto' if hands_off else 'assist'}",
         "  agent_may_resolve:",
         "    - \"safe-mechanical\"   # scalar-sync ports, pointer-copy, generated-state",
         "  min_recommend_confidence: 0.0",
@@ -275,12 +276,40 @@ def build_setup_draft(domains) -> dict:
     }
 
 
+def run_takeover_audit(target: pathlib.Path) -> dict:
+    """First full GC — run MARK once and summarize the standing drift debt of an already-drifted repo.
+
+    A project adopting context-gc when it is already drifted needs a baseline pass before incremental
+    guarding makes sense: the detectors that do not require a confirmed SOURCES map (orphans,
+    duplicates, stale docs, coverage gaps, agent/memory rot) surface the existing debt so it can be
+    cleared in batches. Read-only — this is MARK; it never edits.
+    """
+    mark = pathlib.Path(__file__).resolve().parent / "mark.py"
+    subprocess.run(
+        [sys.executable, str(mark), "--target", str(target)],
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+    )
+    fp = target / ".context-gc" / "findings.json"
+    try:
+        findings = json.loads(fp.read_text(encoding="utf-8")).get("findings", [])
+    except Exception:
+        findings = []
+    by_sev = {"high": 0, "medium": 0, "low": 0}
+    for f in findings:
+        sev = f.get("severity", "low")
+        by_sev[sev] = by_sev.get(sev, 0) + 1
+    rank = {"high": 0, "medium": 1, "low": 2}
+    top = sorted(findings, key=lambda f: rank.get(f.get("severity"), 3))[:8]
+    return {"total": len(findings), "by_severity": by_sev, "top": top}
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Bootstrap context-gc write barrier for a repo")
     ap.add_argument("--target", default=".", help="repository to initialize (default: cwd)")
     ap.add_argument("--force", action="store_true", help="overwrite existing SOURCES.md/config")
     ap.add_argument("--profile", action="store_true", help="write .context-gc/profile.md and profile.json")
     ap.add_argument("--guided", action="store_true", help="also write .context-gc/setup-draft.json for the SKILL setup flow")
+    ap.add_argument("--takeover", action="store_true", help="hands-off adoption: write auto/apply-safe config, then run a first full audit of standing drift")
     a = ap.parse_args()
 
     target = pathlib.Path(a.target).resolve()
@@ -304,7 +333,7 @@ def main() -> int:
 
     sources_path.write_text(render_sources(domains, target.name), encoding="utf-8")
     if not config_path.exists() or a.force:
-        config_path.write_text(render_config(DEFAULT_EXCLUDES), encoding="utf-8")
+        config_path.write_text(render_config(DEFAULT_EXCLUDES, hands_off=a.takeover), encoding="utf-8")
 
     if a.profile or a.guided:
         profile_md, profile_data = render_profile(target, domains)
@@ -324,6 +353,25 @@ def main() -> int:
         print("  wrote: .context-gc/profile.md")
     if a.guided:
         print("  wrote: .context-gc/setup-draft.json")
+
+    if a.takeover:
+        audit = run_takeover_audit(target)
+        bs = audit["by_severity"]
+        print("")
+        print(f"✓ context-gc has taken over {target.name} (hands-off: auto-mark + auto-fix safe mechanical drift)")
+        print(f"  first full MECHANICAL audit — {audit['total']} standing item(s): "
+              f"{bs.get('high', 0)} high, {bs.get('medium', 0)} medium, {bs.get('low', 0)} low")
+        for f in audit["top"]:
+            loc = f.get("file") or ", ".join(f.get("files", []))
+            print(f"    {str(f.get('severity', '?')):6} {str(f.get('type', '?')):26} {loc}")
+        if audit["total"] > len(audit["top"]):
+            print(f"    … +{audit['total'] - len(audit['top'])} more in .context-gc/findings.json")
+        print("  this counts only MECHANICALLY-visible debt (orphans, dupes, stale, rot). Value contradictions")
+        print("  — \"which doc is right\" — are judgment-level and surface as you confirm each domain's root.")
+        print("  from here: I auto-mark on edits and auto-apply safe scalar/pointer fixes; judgment items escalate to you.")
+        nudge = "run the SKILL `review` flow" if a.guided else "clear the standing debt above in batches (highest severity first)"
+        print(f"  next: {nudge} — each item needs your call on the root; the authority map fills in as you go.")
+    elif a.guided:
         print("  next: run the SKILL `setup` flow to confirm ambiguous roots and finish managing drift.")
     else:
         print("  next: confirm roots in SOURCES.md, then run scripts/mark.py --target .")

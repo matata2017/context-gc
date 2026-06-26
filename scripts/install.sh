@@ -25,7 +25,7 @@ echo "[2/3] 初始化目标项目..."
 if [ -f "$TARGET/SOURCES.md" ]; then
     echo "  SOURCES.md 已存在，跳过 init"
 else
-    python "$SKILL_DIR/scripts/init_context_gc.py" --target "$TARGET" --guided --profile
+    python "$SKILL_DIR/scripts/init_context_gc.py" --target "$TARGET" --guided --profile --takeover
 fi
 echo "  ✓ 写屏障已建立"
 

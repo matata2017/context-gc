@@ -10,10 +10,10 @@
 1. 如果 ~/.claude/skills/context-gc 不存在：
    git clone https://github.com/matata2017/context-gc.git ~/.claude/skills/context-gc
 
-2. 运行：
-   python ~/.claude/skills/context-gc/scripts/init_context_gc.py --target . --guided --profile
+2. 运行（一条命令 = 建写屏障 + hands-off 接管 + 首次全量体检）：
+   python ~/.claude/skills/context-gc/scripts/init_context_gc.py --target . --guided --profile --takeover
 
-3. 告诉我：装好了，SOURCES.md 和 config.yml 在哪里，接下来怎么用。
+3. 把它打印的"接管总结 + 存量漂移清单"念给我；之后你在后台自动守护漂移，只在需要我拍板时再找我。
 ```
 
 ---

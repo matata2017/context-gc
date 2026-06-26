@@ -876,6 +876,25 @@
         "Chooses to HOLD: leave queued and escalate for human confirmation/approval (or spawn a higher-authority worker), rather than deciding without that approval",
         "Does not reach past the tool to hand-edit SOURCES.md or CLAUDE.md; treats a pending item as the correct outcome"
       ]
+    },
+    {
+      "id": 49,
+      "name": "takeover-already-drifted-project",
+      "prompt": "A user adopts context-gc on an existing project that has been drifting for months: the README says the API runs on port 8000 but docker-compose maps 8080, the same install steps are copied into three docs, and there is a dead link to a deleted setup guide. They run the hands-off install (init --takeover), which runs a first full mechanical audit. The audit reports 2 items (the dead link, the triplicated block). What should context-gc conclude and tell the user — and what must it NOT claim?",
+      "files": {
+        "README.md": "Start the API at http://localhost:8000.\nInstall: run ./setup.sh then ./migrate.sh then start.\nSee [setup guide](docs/missing-setup.md).\n",
+        "docker-compose.yml": "services:\n  api:\n    ports:\n      - \"8080:8080\"\n",
+        "docs/install.md": "Install: run ./setup.sh then ./migrate.sh then start.\n",
+        "wiki/install.md": "Install: run ./setup.sh then ./migrate.sh then start.\n"
+      },
+      "expected_output": "context-gc treats first contact with an already-drifted project as a baseline 'first full GC' pass, not a clean incremental start. It surfaces the mechanically-visible standing debt the audit found (the dead/orphan link, the triplicated install block to compact to one root). Crucially, it must NOT claim the project is clean or that '2 items' is the whole story: the README-vs-compose port contradiction (8000 vs 8080) is judgment-level — a value contradiction the mechanical pass does not catch — and surfaces only as the user confirms each domain's root. So context-gc explicitly flags that mechanical count != total drift, and that judgment-level contradictions need per-domain root confirmation. It proposes clearing the standing debt in batches, recording each confirmed root in SOURCES.md (the write barrier) so the authority map fills in incrementally. Hands-off mode then auto-marks on edits and auto-applies only safe scalar/pointer fixes; anything needing a truth call escalates for the user's approval. No file is rewritten without confirmation.",
+      "assertions": [
+        "Treats adoption of an already-drifted project as a first full baseline audit, not a clean incremental start",
+        "Surfaces the mechanically-visible debt (orphan/dead link, triplicated block to compact to one root)",
+        "Explicitly refuses to claim the project is clean: states the mechanical count is not the total, and the port contradiction is judgment-level and uncaught by the mechanical pass",
+        "Says judgment-level contradictions surface only as each domain's root is confirmed/approved by the user",
+        "Records confirmed roots in SOURCES.md as the write barrier and clears debt in batches; no rewrite without confirmation"
+      ]
     }
   ]
 }

@@ -27,7 +27,7 @@ $targetPath = (Resolve-Path $Target).Path
 if (Test-Path "$targetPath\SOURCES.md") {
     Write-Host "  SOURCES.md 已存在，跳过 init"
 } else {
-    python "$SkillDir\scripts\init_context_gc.py" --target $targetPath --guided --profile
+    python "$SkillDir\scripts\init_context_gc.py" --target $targetPath --guided --profile --takeover
 }
 Write-Host "  ✓ 写屏障已建立" -ForegroundColor Green
 

@@ -49,8 +49,10 @@ def main():
     if (TARGET / "SOURCES.md").exists():
         print("  SOURCES.md 已存在，跳过 init")
     else:
-        r = run([sys.executable, str(init_py), "--target", str(TARGET), "--guided", "--profile"])
+        r = run([sys.executable, str(init_py), "--target", str(TARGET), "--guided", "--profile", "--takeover"])
         print(f"  {'✓' if r.returncode == 0 else '⚠'} SOURCES.md + config.yml")
+        if r.stdout.strip():
+            print(r.stdout.rstrip())          # 透传接管总结 + 存量债清单
 
     # 3. 完成
     print("[3/3] 完成")
