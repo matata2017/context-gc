@@ -122,7 +122,7 @@ def main() -> int:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     for script_path in sorted((ROOT / "scripts").glob("*.py")):
         name = script_path.name
-        if name in {"_common.py", "run_evals.py", "validate_context_gc.py"}:
+        if name in {"_common.py", "run_evals.py", "validate_context_gc.py", "test_detectors.py"}:
             continue  # internal/test scaffolding, not user-facing runners
         if name not in readme:
             fail(f"README.md Files tree is stale: runner `scripts/{name}` is not listed")

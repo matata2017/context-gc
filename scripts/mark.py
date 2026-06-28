@@ -414,6 +414,25 @@ def _is_translation_subdir(rel: str) -> bool:
     return False
 
 
+def _fenced_spans(text: str) -> list[tuple[int, int]]:
+    """Character ranges covered by fenced code blocks (``` or ~~~). Markdown links and paths
+    inside a fence are examples, not navigable references — orphan checks must skip them."""
+    spans: list[tuple[int, int]] = []
+    open_at: int | None = None
+    pos = 0
+    for line in text.splitlines(keepends=True):
+        if line.lstrip().startswith(("```", "~~~")):
+            if open_at is None:
+                open_at = pos
+            else:
+                spans.append((open_at, pos + len(line)))
+                open_at = None
+        pos += len(line)
+    if open_at is not None:  # unclosed fence — treat the rest of the file as fenced
+        spans.append((open_at, pos))
+    return spans
+
+
 def check_orphans(target: pathlib.Path, files: list[pathlib.Path]) -> list[dict]:
     findings = []
     for path in files:
@@ -426,12 +445,18 @@ def check_orphans(target: pathlib.Path, files: list[pathlib.Path]) -> list[dict]
             text = path.read_text(encoding="utf-8")
         except Exception:
             continue
+        fenced = _fenced_spans(text)
         for m in REF_RE.finditer(text):
+            # A ref inside a fenced code block is an illustrative example, not a navigable
+            # link (see REF_RE note) — flagging it produces noise.
+            if any(s <= m.start() < e for s, e in fenced):
+                continue
             ref = (m.group(1) or m.group(2) or "").strip()
             if not ref or URL_RE.search(ref) or ref.startswith("#"):
                 continue
             ref_clean = ref.split("#", 1)[0].split("?", 1)[0]
-            if not ref_clean or ref_clean.startswith("<") or "{" in ref_clean or " " in ref_clean:
+            # `<topic>` / `{TASK_DIR}` style placeholders are template paths, not real files.
+            if not ref_clean or any(c in ref_clean for c in "<>{}") or " " in ref_clean:
                 continue
             if not re.search(r"\.[A-Za-z0-9]{1,5}$", ref_clean):
                 continue

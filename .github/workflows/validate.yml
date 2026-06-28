@@ -24,6 +24,9 @@ jobs:
       - name: Validate eval fixtures
         run: python scripts/run_evals.py
 
+      - name: Detector FP regression tests
+        run: python scripts/test_detectors.py
+
       - name: Check JSON formatting
         run: python -m json.tool evals/evals.json > /tmp/evals.json
 

@@ -187,7 +187,11 @@ def build_queue(target: pathlib.Path) -> list[dict[str, Any]]:
             "status": "open",
         }
 
-    findings = _load(state / "findings.json").get("findings", [])
+    all_findings = _load(state / "findings.json").get("findings", [])
+    # Drop findings whose observation site no longer exists on disk — a file deleted by a sweep
+    # after findings.json was written leaves a stale decision pointing at a vanished location.
+    # You cannot act on a location that is gone; surfacing it is pure queue noise.
+    findings = [f for f in all_findings if not f.get("file") or (target / f["file"]).exists()]
     for f in findings:
         kind = str(f.get("type", "")).lower()
         status = str(f.get("status", "")).upper()
